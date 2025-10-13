@@ -1,0 +1,41 @@
+# PROJECT BRIEF: Options Profit Calculator Rebuild
+
+## Objective:
+Rebuild optionsprofitcalculator.com with modern UI/UX while preserving all calculation functionality.
+
+## What We're Doing:
+
+### 1. EXTRACT
+- Pull all formulas and calculation logic from downloaded site files
+- Document options pricing math (calls, puts, break-even, P/L calculations)
+- Preserve calculation accuracy - this is the core value
+
+### 2. MODERNIZE UI
+- Use **shadcn/ui MCP** to build professional component library
+- Pull a **SaaS template** as foundation for layout/design system
+- Implement dark mode, smooth animations, responsive design
+- Transform "Excel spreadsheet" look into polished web app
+
+### 3. REBUILD
+- React + Tailwind CSS + shadcn components
+- Recharts for interactive profit/loss visualization
+- Card-based layout with clear visual hierarchy
+- Mobile-first responsive design
+
+## Tech Stack:
+- **Base**: SaaS landing page template
+- **Components**: shadcn/ui via MCP
+- **Framework**: React with hooks
+- **Styling**: Tailwind CSS
+- **Charts**: Recharts
+- **Logic**: Extracted formulas from original site
+
+## Key Features to Preserve:
+- Real-time P/L calculations
+- Break-even price display
+- Interactive profit/loss chart
+- Support for long/short calls and puts
+- Data table with price points
+
+## Outcome:
+Same powerful calculator, looks like a modern fintech SaaS product instead of a 2010 website.
