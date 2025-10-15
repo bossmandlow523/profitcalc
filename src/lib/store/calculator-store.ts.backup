@@ -1,0 +1,227 @@
+import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
+import { immer } from 'zustand/middleware/immer';
+import type {
+  CalculationInputs,
+  CalculationResults,
+  OptionLeg,
+  OptionLegInput
+} from '../types';
+import {
+  StrategyType
+} from '../types';
+import {
+  DEFAULT_RISK_FREE_RATE,
+  DEFAULT_VOLATILITY,
+  DEFAULT_PRICE_RANGE,
+  DEFAULT_CHART_POINTS
+} from '../constants/defaults';
+import {
+  validateInputs,
+  calcInitialCost,
+  calcMaxProfit,
+  calcMaxLoss,
+  findBreakEvens,
+  calcAggregateGreeks,
+  generatePLData,
+  calcLegPL
+} from '../calculations';
+
+interface UserPreferences {
+  theme: 'light' | 'dark';
+  defaultVolatility: number;
+  defaultRiskFreeRate: number;
+  defaultPriceRange: number;
+  defaultChartPoints: number;
+  showGreeks: boolean;
+  showAdvancedOptions: boolean;
+  currencyFormat: 'USD' | 'compact';
+}
+
+interface CalculatorStore {
+  // State
+  inputs: CalculationInputs;
+  results: CalculationResults | null;
+  selectedStrategy: StrategyType;
+  isCalculating: boolean;
+  preferences: UserPreferences;
+  error: string | null;
+
+  // Actions
+  setInputs: (inputs: Partial<CalculationInputs>) => void;
+  addLeg: (leg: OptionLegInput) => void;
+  updateLeg: (id: string, updates: Partial<OptionLeg>) => void;
+  removeLeg: (id: string) => void;
+  setStrategy: (strategy: StrategyType) => void;
+  calculate: () => void;
+  reset: () => void;
+  setPreferences: (prefs: Partial<UserPreferences>) => void;
+}
+
+const initialState = {
+  inputs: {
+    currentStockPrice: 100,
+    legs: [],
+    volatility: DEFAULT_VOLATILITY,
+    riskFreeRate: DEFAULT_RISK_FREE_RATE,
+    priceRange: DEFAULT_PRICE_RANGE,
+    chartPoints: DEFAULT_CHART_POINTS,
+  },
+  results: null,
+  selectedStrategy: StrategyType.LONG_CALL,
+  isCalculating: false,
+  error: null,
+  preferences: {
+    theme: 'dark' as const,
+    defaultVolatility: DEFAULT_VOLATILITY,
+    defaultRiskFreeRate: DEFAULT_RISK_FREE_RATE,
+    defaultPriceRange: DEFAULT_PRICE_RANGE,
+    defaultChartPoints: DEFAULT_CHART_POINTS,
+    showGreeks: true,
+    showAdvancedOptions: false,
+    currencyFormat: 'USD' as const,
+  },
+};
+
+export const useCalculatorStore = create<CalculatorStore>()(
+  devtools(
+    immer((set, get) => ({
+      ...initialState,
+
+      setInputs: (newInputs) => {
+        set((state) => {
+          state.inputs = { ...state.inputs, ...newInputs };
+          state.error = null;
+        });
+      },
+
+      addLeg: (legInput) => {
+        set((state) => {
+          const newLeg: OptionLeg = {
+            id: crypto.randomUUID(),
+            ...legInput,
+            expiryDate: new Date(legInput.expiryDate),
+          };
+          state.inputs.legs.push(newLeg);
+          state.error = null;
+        });
+      },
+
+      updateLeg: (id, updates) => {
+        set((state) => {
+          const index = state.inputs.legs.findIndex(leg => leg.id === id);
+          if (index !== -1) {
+            state.inputs.legs[index] = {
+              ...state.inputs.legs[index],
+              ...updates,
+            };
+          }
+        });
+      },
+
+      removeLeg: (id) => {
+        set((state) => {
+          state.inputs.legs = state.inputs.legs.filter(leg => leg.id !== id);
+        });
+      },
+
+      setStrategy: (strategy) => {
+        set((state) => {
+          state.selectedStrategy = strategy;
+          // Note: Strategy template application would go here
+          // For now, just clear legs when changing strategy
+          if (strategy !== StrategyType.CUSTOM) {
+            state.inputs.legs = [];
+          }
+        });
+      },
+
+      calculate: () => {
+        const { inputs } = get();
+
+        set({ isCalculating: true, error: null });
+
+        try {
+          // Validate inputs
+          const validation = validateInputs(inputs);
+          if (!validation.isValid) {
+            throw new Error(validation.errors[0]?.message || 'Invalid inputs');
+          }
+
+          // Perform calculations
+          const { currentStockPrice, legs, volatility, riskFreeRate, priceRange, chartPoints } = inputs;
+
+          // Calculate initial cost
+          const initialCost = calcInitialCost(legs);
+
+          // Calculate max profit and loss
+          const maxProfit = calcMaxProfit(legs, currentStockPrice);
+          const maxLoss = calcMaxLoss(legs, currentStockPrice);
+
+          // Find break-even points
+          const breakEvenPoints = findBreakEvens(legs, currentStockPrice, priceRange || DEFAULT_PRICE_RANGE);
+
+          // Calculate Greeks if volatility and risk-free rate provided
+          let greeks;
+          if (volatility !== undefined && riskFreeRate !== undefined) {
+            greeks = calcAggregateGreeks(legs, currentStockPrice, riskFreeRate, volatility);
+          }
+
+          // Generate chart data
+          const chartData = generatePLData(legs, currentStockPrice, {
+            priceRange: priceRange || DEFAULT_PRICE_RANGE,
+            points: chartPoints || DEFAULT_CHART_POINTS,
+          });
+
+          // Calculate individual leg results
+          const legResults = legs.map(leg => ({
+            legId: leg.id,
+            intrinsicValue: calcIntrinsicValue(leg, currentStockPrice),
+            profitLoss: calcLegPL(leg, currentStockPrice),
+          }));
+
+          const results: CalculationResults = {
+            maxProfit,
+            maxLoss,
+            breakEvenPoints,
+            initialCost,
+            greeks,
+            chartData,
+            legResults,
+          };
+
+          set({ results, isCalculating: false, error: null });
+        } catch (error) {
+          console.error('Calculation failed:', error);
+          set({
+            isCalculating: false,
+            error: error instanceof Error ? error.message : 'Calculation failed'
+          });
+        }
+      },
+
+      reset: () => {
+        set(initialState);
+      },
+
+      setPreferences: (prefs) => {
+        set((state) => {
+          state.preferences = { ...state.preferences, ...prefs };
+        });
+      },
+    }))
+  )
+);
+
+/**
+ * Calculate intrinsic value for a leg
+ */
+function calcIntrinsicValue(leg: OptionLeg, stockPrice: number): number {
+  const { optionType, strikePrice } = leg;
+
+  if (optionType === 'call') {
+    return Math.max(0, stockPrice - strikePrice);
+  } else {
+    return Math.max(0, strikePrice - stockPrice);
+  }
+}

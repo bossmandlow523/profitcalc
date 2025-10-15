@@ -26,7 +26,14 @@
       "Read(//c/Users/nicks/AppData/Roaming/**)",
       "Bash(cat:*)",
       "Bash(find:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Read(//c/Users/nicks/OneDrive/Desktop/optionscalc/design-system/**)",
+      "Bash(npx tsc:*)",
+      "Bash(taskkill:*)",
+      "Bash(del \"c:\\Users\\nicks\\OneDrive\\Desktop\\calc\\src\\components\\home\\ColoredTextFlip.tsx\")",
+      "Bash(python -m pip install:*)",
+      "Bash(python:*)",
+      "Bash(curl \"http://localhost:8000/api/stocks/EOSE/quote\")"
     ]
   },
   "enableAllProjectMcpServers": true,
