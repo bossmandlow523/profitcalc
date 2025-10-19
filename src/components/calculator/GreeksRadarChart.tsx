@@ -1,10 +1,10 @@
 /**
- * Greeks Radial Bar Chart Component
- * Displays option Greeks (Delta, Gamma, Theta, Vega, Rho) in a radial bar chart visualization
+ * Greeks Visualization Component
+ * Displays option Greeks with proper unit-aware visualization
+ * Uses grouped bar charts instead of forcing different units onto same scale
  */
 
 import { useMemo, useEffect, useState } from 'react'
-import { RadialBarChart, RadialBarSeries, RadialBar } from 'reaviz'
 import { OptionLeg } from '@/lib/types'
 import { calcAggregateGreeks } from '@/lib/calculations/greeks'
 import { CircularProgressCombined } from '@/components/ui/circular-progress'
@@ -16,6 +16,19 @@ interface GreeksRadarChartProps {
   volatility: number
   className?: string
   isLoading?: boolean
+}
+
+interface GreekData {
+  name: string
+  symbol: string
+  value: number
+  unit: string
+  description: string
+  isZero: boolean
+  color: string
+  impact: string
+  maxScale: number
+  badge?: string
 }
 
 export function GreeksRadarChart({
@@ -43,244 +56,212 @@ export function GreeksRadarChart({
     }
   }, [])
 
-  const radialData = useMemo(() => {
+  const greeksData = useMemo(() => {
     if (legs.length === 0 || currentStockPrice <= 0) return null
 
     try {
       // Calculate aggregate Greeks for the entire position
       const greeks = calcAggregateGreeks(legs, currentStockPrice, riskFreeRate, volatility)
 
-      // Normalization function: maps each Greek to 0-100 scale based on typical ranges
-      const normalizeGreek = (value: number, type: 'delta' | 'gamma' | 'theta' | 'vega' | 'rho'): number => {
-        switch (type) {
-          case 'delta':
-            // Delta ranges from -100 to +100, normalize to 0-100
-            return Math.min(100, Math.max(0, (Math.abs(value) / 100) * 100))
-          case 'gamma':
-            // Gamma typically 0 to 0.1, scale up
-            return Math.min(100, (Math.abs(value) / 0.1) * 100)
-          case 'theta':
-            // Theta typically -10 to +10, normalize absolute value
-            return Math.min(100, (Math.abs(value) / 10) * 100)
-          case 'vega':
-            // Vega typically 0 to 50
-            return Math.min(100, (Math.abs(value) / 50) * 100)
-          case 'rho':
-            // Rho typically -10 to +10
-            return Math.min(100, (Math.abs(value) / 10) * 100)
-          default:
-            return 0
-        }
-      }
-
-      // Normalize Greeks for visualization
-      const normalizedGreeks = {
-        delta: normalizeGreek(greeks.delta, 'delta'),
-        gamma: normalizeGreek(greeks.gamma, 'gamma'),
-        theta: normalizeGreek(greeks.theta, 'theta'),
-        vega: normalizeGreek(greeks.vega, 'vega'),
-        rho: normalizeGreek(greeks.rho, 'rho'),
-      }
-
-      // Format data for RadialBarChart - filter out zero values
-      const chartData = [
-        { key: 'Delta', data: normalizedGreeks.delta, isNegative: greeks.delta < 0 },
-        { key: 'Gamma', data: normalizedGreeks.gamma, isNegative: false },
-        { key: 'Theta', data: normalizedGreeks.theta, isNegative: greeks.theta < 0 },
-        { key: 'Vega', data: normalizedGreeks.vega, isNegative: false },
-        { key: 'Rho', data: normalizedGreeks.rho, isNegative: greeks.rho < 0 },
-      ].filter(item => item.data > 0.01) // Filter out effectively zero values
-
+      /**
+       * Greeks grouped by category to avoid mixing units
+       * Each category has its own scale and visual treatment
+       */
       return {
         rawGreeks: greeks,
-        normalizedGreeks,
-        chartData
+        categories: {
+          directional: {
+            label: 'Directional Exposure',
+            description: 'How the position moves with stock price',
+            greeks: [
+              {
+                name: 'Delta',
+                symbol: 'Δ',
+                value: greeks.delta,
+                unit: 'shares',
+                description: `Equivalent to ${Math.abs(Math.round(greeks.delta))} shares of stock`,
+                isZero: Math.abs(greeks.delta) < 0.01,
+                color: greeks.delta >= 0 ? '#10B981' : '#EF4444',
+                impact: 'high',
+                // Scale: typical range is -100 to +100 for single option positions
+                maxScale: 100
+              },
+              {
+                name: 'Gamma',
+                symbol: 'Γ',
+                value: greeks.gamma,
+                unit: 'Δ per $1',
+                description: 'How fast Delta changes as stock moves',
+                isZero: Math.abs(greeks.gamma) < 0.001,
+                color: greeks.gamma >= 0 ? '#8B5CF6' : '#7C3AED',
+                impact: 'medium',
+                // Scale: typical range is 0 to 0.1
+                maxScale: 0.1
+              }
+            ] as GreekData[]
+          },
+          timeSensitivity: {
+            label: 'Time Sensitivity',
+            description: 'Daily profit/loss from time decay',
+            greeks: [
+              {
+                name: 'Theta',
+                symbol: 'Θ',
+                value: greeks.theta,
+                unit: '$ per day',
+                description: greeks.theta < 0 ? 'Losing money each day' : 'Earning money each day',
+                isZero: Math.abs(greeks.theta) < 0.01,
+                color: greeks.theta >= 0 ? '#10B981' : '#F59E0B',
+                impact: 'high',
+                badge: greeks.theta < 0 ? 'DECAY' : 'EARNING',
+                // Scale: typical range is -50 to +50
+                maxScale: 50
+              }
+            ] as GreekData[]
+          },
+          volatilitySensitivity: {
+            label: 'Volatility Sensitivity',
+            description: 'P&L change from IV movement',
+            greeks: [
+              {
+                name: 'Vega',
+                symbol: 'ν',
+                value: greeks.vega,
+                unit: '$ per 1% IV',
+                description: 'Profit/loss per 1% change in implied volatility',
+                isZero: Math.abs(greeks.vega) < 0.01,
+                color: greeks.vega >= 0 ? '#3B82F6' : '#2563EB',
+                impact: 'medium',
+                // Scale: typical range is 0 to 100
+                maxScale: 100
+              }
+            ] as GreekData[]
+          },
+          rateSensitivity: {
+            label: 'Interest Rate Sensitivity',
+            description: 'P&L change from rate changes',
+            greeks: [
+              {
+                name: 'Rho',
+                symbol: 'ρ',
+                value: greeks.rho,
+                unit: '$ per 1% Δr',
+                description: 'Profit/loss per 1% change in interest rates',
+                isZero: Math.abs(greeks.rho) < 0.01,
+                color: greeks.rho >= 0 ? '#EC4899' : '#EF4444',
+                impact: 'low',
+                // Scale: typical range is -50 to +50
+                maxScale: 50
+              }
+            ] as GreekData[]
+          }
+        }
       }
     } catch (error) {
-      console.error('Error calculating Greeks for radial chart:', error)
+      console.error('Error calculating Greeks:', error)
       return null
     }
   }, [legs, currentStockPrice, riskFreeRate, volatility])
 
   if (isLoading) {
     return (
-      <div className={`flex flex-col h-full ${className}`}>
-        <div className="dashboard-card-header">
-          <h3 className="dashboard-card-title">Greeks Overview</h3>
-          <p className="dashboard-card-subtitle">
-            Risk metrics (Delta, Gamma, Theta, Vega, Rho)
-          </p>
+      <div className={`flex items-center justify-center h-full ${className}`}>
+        <div className="flex flex-col items-center gap-4">
+          <CircularProgressCombined size={80} thickness={6} />
+          <p className="text-sm text-gray-400">Calculating Greeks...</p>
         </div>
-        <div className="flex-1 flex items-center justify-center bg-[#0a0a0f] border-2 border-dashed border-[#333333] rounded min-h-[200px]">
-          <div className="flex flex-col items-center gap-4">
-            <CircularProgressCombined size={80} thickness={6} />
-            <p className="text-sm text-gray-400">Calculating Greeks...</p>
+      </div>
+    )
+  }
+
+  if (!greeksData) {
+    return (
+      <div className={`flex items-center justify-center h-full ${className}`}>
+        <p className="text-sm text-gray-400">Add options to see Greeks analysis</p>
+      </div>
+    )
+  }
+
+  const { categories } = greeksData
+
+  /**
+   * Compact Greek card - optimized for grid layout
+   */
+  const GreekBar = ({ greek }: { greek: GreekData }) => {
+    const percentage = Math.min((Math.abs(greek.value) / greek.maxScale) * 100, 100)
+    const isNegative = greek.value < 0
+    const isZero = greek.isZero
+
+    return (
+      <div className="bg-dark-800/50 rounded-lg p-2.5 border border-white/10">
+        {/* Header with name and badges */}
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-sm font-bold text-gray-200">{greek.name} ({greek.symbol})</span>
+          <div className="flex items-center gap-1">
+            {greek.badge && (
+              <span className={`text-[8px] px-1.5 py-0.5 rounded font-medium ${
+                greek.badge === 'DECAY' ? 'bg-orange-500/20 text-orange-400' : 'bg-green-500/20 text-green-400'
+              }`}>
+                {greek.badge}
+              </span>
+            )}
+            {isZero && (
+              <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-500 font-medium">ZERO</span>
+            )}
           </div>
         </div>
+
+        {/* Value and unit on same line */}
+        <div className="flex items-baseline gap-2 mb-1.5">
+          <div className={`text-xl font-bold ${
+            isZero ? 'text-gray-500' : isNegative ? 'text-red-400' : 'text-green-400'
+          }`}>
+            {isZero ? '—' : `${isNegative ? '−' : '+'} ${Math.abs(greek.value).toFixed(greek.name === 'Gamma' ? 3 : 2)}`}
+          </div>
+          <div className="text-[9px] text-gray-500">{greek.unit}</div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="relative h-1.5 bg-dark-900 rounded-full overflow-hidden">
+          {isZero ? (
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-gray-500"></div>
+          ) : (
+            <div
+              className="absolute top-0 bottom-0 rounded-full transition-all"
+              style={{
+                width: `${percentage}%`,
+                backgroundColor: greek.color
+              }}
+            />
+          )}
+        </div>
       </div>
     )
   }
-
-  if (!radialData) {
-    return (
-      <div className={`flex flex-col h-full ${className}`}>
-        <div className="dashboard-card-header">
-          <h3 className="dashboard-card-title">Greeks Overview</h3>
-          <p className="dashboard-card-subtitle">
-            Risk metrics (Delta, Gamma, Theta, Vega, Rho)
-          </p>
-        </div>
-        <div className="flex-1 flex items-center justify-center bg-[#0a0a0f] border-2 border-dashed border-[#333333] rounded min-h-[200px]">
-          <p className="text-[#666666] text-sm text-center">
-            [Chart Area - Greeks Overview]
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  const { rawGreeks, normalizedGreeks, chartData } = radialData
-
-  // Color mapping based on positive/negative values
-  const getGreekColor = (key: string, isNegative: boolean) => {
-    const baseColors = {
-      'Delta': isNegative ? '#EF4444' : '#10B981', // Red/Green
-      'Gamma': '#8B5CF6', // Purple (always positive)
-      'Theta': isNegative ? '#F59E0B' : '#10B981', // Orange/Green
-      'Vega': '#3B82F6', // Blue (always positive)
-      'Rho': isNegative ? '#EF4444' : '#EC4899', // Red/Pink
-    }
-    return baseColors[key as keyof typeof baseColors] || '#666666'
-  }
-
-  // Map colors to each chart data item
-  const chartDataWithColors = chartData.map(item => ({
-    ...item,
-    color: getGreekColor(item.key, item.isNegative)
-  }))
-
-  const colorScheme = chartDataWithColors.map(item => item.color)
 
   return (
-    <div className={`flex flex-col h-full ${className}`}>
-      <div className="dashboard-card-header">
-        <h3 className="dashboard-card-title">Greeks Overview</h3>
-        <p className="dashboard-card-subtitle">
-          Risk metrics (Delta, Gamma, Theta, Vega, Rho)
-        </p>
-      </div>
+    <div className={`flex flex-col ${className}`}>
+      {/* Compact grid - 2 columns on larger screens */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Delta */}
+        {categories.directional.greeks.map(greek => (
+          <GreekBar key={greek.name} greek={greek} />
+        ))}
 
-      {/* Radial Bar Chart */}
-      <div className="mb-3 relative flex items-center justify-center">
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-[250px] h-[250px] rounded-full bg-gradient-to-br from-purple-500/10 via-blue-500/10 to-green-500/10 blur-3xl"></div>
-        </div>
-        {/* Scale reference circles */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="relative" style={{ width: 368, height: 368 }}>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/5" style={{ width: '25%', height: '25%' }}></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" style={{ width: '50%', height: '50%' }}></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/15" style={{ width: '75%', height: '75%' }}></div>
-            {/* Scale labels */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 text-[10px] text-gray-600" style={{ marginTop: '-50%' }}>100%</div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 text-[10px] text-gray-600" style={{ marginTop: '-37.5%' }}>75%</div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 text-[10px] text-gray-600" style={{ marginTop: '-25%' }}>50%</div>
-          </div>
-        </div>
-        <RadialBarChart
-          height={368}
-          width={368}
-          data={chartDataWithColors}
-          innerRadius={15}
-          series={
-            <RadialBarSeries
-              colorScheme={colorScheme}
-              bar={<RadialBar gradient={false} />}
-            />
-          }
-        />
-      </div>
+        {/* Theta */}
+        {categories.timeSensitivity.greeks.map(greek => (
+          <GreekBar key={greek.name} greek={greek} />
+        ))}
 
-      {/* Legend */}
-      <div className="mb-3 flex flex-wrap gap-3 justify-center px-2">
-        {chartDataWithColors.map((item) => {
-          const normalizedValue = normalizedGreeks[item.key.toLowerCase() as keyof typeof normalizedGreeks]
+        {/* Vega */}
+        {categories.volatilitySensitivity.greeks.map(greek => (
+          <GreekBar key={greek.name} greek={greek} />
+        ))}
 
-          return (
-            <div key={item.key} className="flex items-center gap-1.5 text-xs">
-              <div
-                className="w-3 h-3 rounded-sm"
-                style={{ backgroundColor: item.color }}
-              />
-              <span className="text-gray-300 font-medium">{item.key}</span>
-              <span className="text-gray-500">
-                ({normalizedValue.toFixed(0)}%)
-              </span>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Greeks Summary Table - Compact Grid */}
-      <div className="bg-dark-800/30 rounded-lg p-3 border border-white/10">
-        <div className="text-xs font-semibold text-white mb-2">Greeks Values</div>
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
-          <div className="bg-dark-900/50 rounded-lg p-2 border border-white/5">
-            <div className="text-xs text-gray-400 mb-0.5">Delta (Δ)</div>
-            <div className={`text-base font-bold ${rawGreeks.delta >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {rawGreeks.delta >= 0 ? '+' : ''}{rawGreeks.delta.toFixed(2)}
-            </div>
-            <div className="text-[10px] text-gray-500 mt-0.5">
-              {Math.abs(Math.round(rawGreeks.delta))} shares
-            </div>
-          </div>
-
-          <div className="bg-dark-900/50 rounded-lg p-2 border border-white/5">
-            <div className="text-xs text-gray-400 mb-0.5">Gamma (Γ)</div>
-            <div className="text-base font-bold text-purple-400">
-              {rawGreeks.gamma.toFixed(3)}
-            </div>
-            <div className="text-[10px] text-gray-500 mt-0.5">
-              Delta change
-            </div>
-          </div>
-
-          <div className="bg-dark-900/50 rounded-lg p-2 border border-white/5">
-            <div className="text-xs text-gray-400 mb-0.5">Theta (Θ)</div>
-            <div className={`text-base font-bold ${rawGreeks.theta >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {rawGreeks.theta >= 0 ? '+' : ''}${rawGreeks.theta.toFixed(2)}
-            </div>
-            <div className="text-[10px] text-gray-500 mt-0.5">
-              Per day
-            </div>
-          </div>
-
-          <div className="bg-dark-900/50 rounded-lg p-2 border border-white/5">
-            <div className="text-xs text-gray-400 mb-0.5">Vega (ν)</div>
-            <div className="text-base font-bold text-blue-400">
-              {rawGreeks.vega.toFixed(2)}
-            </div>
-            <div className="text-[10px] text-gray-500 mt-0.5">
-              Per 1% IV
-            </div>
-          </div>
-
-          <div className="bg-dark-900/50 rounded-lg p-2 border border-white/5">
-            <div className="text-xs text-gray-400 mb-0.5">Rho (ρ)</div>
-            <div className={`text-base font-bold ${rawGreeks.rho >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {rawGreeks.rho >= 0 ? '+' : ''}{rawGreeks.rho.toFixed(2)}
-            </div>
-            <div className="text-[10px] text-gray-500 mt-0.5">
-              Per 1% rate
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Info note */}
-      <div className="mt-2 text-[10px] text-gray-500 italic">
-        Note: Greeks are aggregate values for the entire position. Delta shows directional exposure,
-        Theta shows daily time decay, Vega shows volatility sensitivity.
+        {/* Rho */}
+        {categories.rateSensitivity.greeks.map(greek => (
+          <GreekBar key={greek.name} greek={greek} />
+        ))}
       </div>
     </div>
   )

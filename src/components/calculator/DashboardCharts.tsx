@@ -1,19 +1,13 @@
 /**
  * Dashboard Charts Component
- * Uses v0-dashboard layout system for consistent, responsive chart display
+ * Heatmap with parent container, Greeks stacked as aside
  */
 
+import { useMemo } from 'react'
 import { OptionLeg } from '@/lib/types'
 import { PLHeatmap } from './PLHeatmap'
-import { GreeksRadarChart } from './GreeksRadarChart'
-import {
-  OptionsChartGrid,
-  MainChartArea,
-  SidebarArea,
-  SmallChartArea,
-  MediumChartArea,
-  ChartLayoutContainer
-} from '@/components/v0-dashboard'
+import { calcAggregateGreeks } from '@/lib/calculations/greeks'
+import { Card } from '@/components/ui/card'
 
 interface DashboardChartsProps {
   legs: OptionLeg[]
@@ -36,19 +30,27 @@ export function DashboardCharts({
   priceRangeMax,
   isLoading = false
 }: DashboardChartsProps) {
+  // Calculate Greeks
+  const greeks = useMemo(() => {
+    if (legs.length === 0 || currentStockPrice <= 0) return null
+    try {
+      return calcAggregateGreeks(legs, currentStockPrice, riskFreeRate, volatility)
+    } catch (error) {
+      console.error('Error calculating Greeks:', error)
+      return null
+    }
+  }, [legs, currentStockPrice, riskFreeRate, volatility])
+
   return (
     <div className="w-full">
-      <OptionsChartGrid layout="default">
-        {/* P/L Heatmap - Main vertical chart area (2 columns wide, 3 rows tall) */}
-        <div className="lg:col-span-2 lg:row-span-3">
-          <ChartLayoutContainer
-            title="Profit/Loss Heatmap"
-            subtitle="P&L across price and time"
-            value={`$${currentStockPrice.toFixed(2)}`}
-            valueLabel="Current Price"
-            chartHeight="full"
-            headerLayout="compact"
-          >
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {/* Heatmap Container - Main Content */}
+        <div className="flex-1 w-full">
+          <Card className="p-6">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-white">Profit/Loss Heatmap</h3>
+              <p className="text-sm text-gray-400 mt-1">P&L across price and time</p>
+            </div>
             <PLHeatmap
               legs={legs}
               currentStockPrice={currentStockPrice}
@@ -60,102 +62,135 @@ export function DashboardCharts({
               isLoading={isLoading}
               className="h-full w-full"
             />
-          </ChartLayoutContainer>
+          </Card>
         </div>
 
-        {/* Greeks Radar Chart - Row 1, spans 2 columns */}
-        <div className="lg:col-span-2 lg:row-span-1">
-          <ChartLayoutContainer
-            title="Greeks Analysis"
-            subtitle="Risk metrics visualization"
-            chartHeight="small"
-          >
-            <GreeksRadarChart
-              legs={legs}
-              currentStockPrice={currentStockPrice}
-              riskFreeRate={riskFreeRate}
-              volatility={volatility}
-              isLoading={isLoading}
-              className="h-full w-full"
-            />
-          </ChartLayoutContainer>
-        </div>
+        {/* Greeks Sidebar - Right Side */}
+        {greeks && (
+          <aside className="w-full lg:w-80 flex-shrink-0">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-white">Greeks Analysis</h3>
+              <p className="text-xs text-gray-400 mt-1">Risk metrics</p>
+            </div>
 
-        {/* Row 2 - Two charts side by side */}
-        {/* Profit Distribution */}
-        <div className="lg:col-span-1 lg:row-span-1">
-          <ChartLayoutContainer
-            title="Profit Distribution"
-            subtitle="Probability analysis"
-            chartHeight="small"
-          >
-            <PlaceholderChart
-              title="Profit Distribution"
-              description="Probability analysis coming soon"
-              isLoading={isLoading}
-            />
-          </ChartLayoutContainer>
-        </div>
+            <div className="flex flex-col gap-3">
+              {/* Delta */}
+              <Card className="p-2.5 border border-white/10">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-bold text-gray-200">Delta (Δ)</span>
+                </div>
+                <div className="flex items-baseline gap-2 mb-1.5">
+                  <div className="text-lg font-bold" style={{ color: greeks.delta >= 0 ? '#10B981' : '#EF4444' }}>
+                    {greeks.delta >= 0 ? '+' : '−'} {Math.abs(greeks.delta).toFixed(2)}
+                  </div>
+                  <div className="text-[9px] text-gray-500">shares</div>
+                </div>
+                <div className="relative h-1.5 bg-dark-900 rounded-full overflow-hidden">
+                  <div
+                    className="absolute top-0 bottom-0 rounded-full transition-all"
+                    style={{
+                      width: `${Math.min((Math.abs(greeks.delta) / 100) * 100, 100)}%`,
+                      backgroundColor: greeks.delta >= 0 ? '#10B981' : '#EF4444'
+                    }}
+                  />
+                </div>
+              </Card>
 
-        {/* Time Decay Analysis */}
-        <div className="lg:col-span-1 lg:row-span-1">
-          <ChartLayoutContainer
-            title="Time Decay"
-            subtitle="Theta impact over time"
-            chartHeight="small"
-          >
-            <PlaceholderChart
-              title="Time Decay Analysis"
-              description="Theta decay visualization coming soon"
-              isLoading={isLoading}
-            />
-          </ChartLayoutContainer>
-        </div>
+              {/* Gamma */}
+              <Card className="p-2.5 border border-white/10">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-bold text-gray-200">Gamma (Γ)</span>
+                </div>
+                <div className="flex items-baseline gap-2 mb-1.5">
+                  <div className="text-lg font-bold" style={{ color: '#8B5CF6' }}>
+                    {greeks.gamma >= 0 ? '+' : '−'} {Math.abs(greeks.gamma).toFixed(3)}
+                  </div>
+                  <div className="text-[9px] text-gray-500">Δ per $1</div>
+                </div>
+                <div className="relative h-1.5 bg-dark-900 rounded-full overflow-hidden">
+                  <div
+                    className="absolute top-0 bottom-0 rounded-full transition-all"
+                    style={{
+                      width: `${Math.min((Math.abs(greeks.gamma) / 0.1) * 100, 100)}%`,
+                      backgroundColor: '#8B5CF6'
+                    }}
+                  />
+                </div>
+              </Card>
 
-        {/* Volatility Sensitivity */}
-        <div className="lg:col-span-1 lg:row-span-1">
-          <ChartLayoutContainer
-            title="Volatility"
-            subtitle="IV impact analysis"
-            chartHeight="small"
-          >
-            <PlaceholderChart
-              title="Volatility Sensitivity"
-              description="IV impact analysis coming soon"
-              isLoading={isLoading}
-            />
-          </ChartLayoutContainer>
-        </div>
-      </OptionsChartGrid>
-    </div>
-  )
-}
+              {/* Theta */}
+              <Card className="p-2.5 border border-white/10">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-bold text-gray-200">Theta (Θ)</span>
+                  {greeks.theta < 0 && (
+                    <span className="text-[8px] px-1.5 py-0.5 rounded font-medium bg-orange-500/20 text-orange-400">
+                      DECAY
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-baseline gap-2 mb-1.5">
+                  <div className="text-lg font-bold" style={{ color: greeks.theta >= 0 ? '#10B981' : '#F59E0B' }}>
+                    {greeks.theta >= 0 ? '+' : '−'} {Math.abs(greeks.theta).toFixed(2)}
+                  </div>
+                  <div className="text-[9px] text-gray-500">$ per day</div>
+                </div>
+                <div className="relative h-1.5 bg-dark-900 rounded-full overflow-hidden">
+                  <div
+                    className="absolute top-0 bottom-0 rounded-full transition-all"
+                    style={{
+                      width: `${Math.min((Math.abs(greeks.theta) / 50) * 100, 100)}%`,
+                      backgroundColor: greeks.theta >= 0 ? '#10B981' : '#F59E0B'
+                    }}
+                  />
+                </div>
+              </Card>
 
-/**
- * Placeholder component for charts under development
- */
-interface PlaceholderChartProps {
-  title: string
-  description: string
-  isLoading?: boolean
-}
+              {/* Vega */}
+              <Card className="p-2.5 border border-white/10">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-bold text-gray-200">Vega (ν)</span>
+                </div>
+                <div className="flex items-baseline gap-2 mb-1.5">
+                  <div className="text-lg font-bold" style={{ color: '#3B82F6' }}>
+                    {greeks.vega >= 0 ? '+' : '−'} {Math.abs(greeks.vega).toFixed(2)}
+                  </div>
+                  <div className="text-[9px] text-gray-500">$ per 1% IV</div>
+                </div>
+                <div className="relative h-1.5 bg-dark-900 rounded-full overflow-hidden">
+                  <div
+                    className="absolute top-0 bottom-0 rounded-full transition-all"
+                    style={{
+                      width: `${Math.min((Math.abs(greeks.vega) / 100) * 100, 100)}%`,
+                      backgroundColor: '#3B82F6'
+                    }}
+                  />
+                </div>
+              </Card>
 
-function PlaceholderChart({ description, isLoading }: PlaceholderChartProps) {
-  if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-700 border-t-primary"></div>
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex h-full items-center justify-center">
-      <div className="text-center">
-        <p className="text-sm text-muted-foreground">{description}</p>
+              {/* Rho */}
+              <Card className="p-2.5 border border-white/10">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-bold text-gray-200">Rho (ρ)</span>
+                </div>
+                <div className="flex items-baseline gap-2 mb-1.5">
+                  <div className="text-lg font-bold" style={{ color: greeks.rho >= 0 ? '#EC4899' : '#EF4444' }}>
+                    {greeks.rho >= 0 ? '+' : '−'} {Math.abs(greeks.rho).toFixed(2)}
+                  </div>
+                  <div className="text-[9px] text-gray-500">$ per 1% Δr</div>
+                </div>
+                <div className="relative h-1.5 bg-dark-900 rounded-full overflow-hidden">
+                  <div
+                    className="absolute top-0 bottom-0 rounded-full transition-all"
+                    style={{
+                      width: `${Math.min((Math.abs(greeks.rho) / 50) * 100, 100)}%`,
+                      backgroundColor: greeks.rho >= 0 ? '#EC4899' : '#EF4444'
+                    }}
+                  />
+                </div>
+              </Card>
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   )

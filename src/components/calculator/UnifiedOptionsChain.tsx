@@ -30,6 +30,8 @@ export function UnifiedOptionsChain({
   const [showLeftArrow, setShowLeftArrow] = useState(false)
   const [showRightArrow, setShowRightArrow] = useState(false)
   const tabScrollContainerRef = useRef<HTMLDivElement>(null)
+  const tableContainerRef = useRef<HTMLDivElement>(null)
+  const currentPriceRowRef = useRef<HTMLTableRowElement>(null)
 
   // Lock body scroll when modal is mounted
   useEffect(() => {
@@ -54,7 +56,8 @@ export function UnifiedOptionsChain({
 
   // Auto-select first expiry date
   useEffect(() => {
-    const expiryData = (expiryDates.data as any)?.data
+    // Store already handles the double-nested response structure
+    const expiryData = expiryDates.data as any
     if (expiryData?.expiryDates && expiryData.expiryDates.length > 0 && !selectedExpiryTab) {
       const firstExpiry = expiryData.expiryDates[0].date
       setSelectedExpiryTab(firstExpiry)
@@ -73,7 +76,8 @@ export function UnifiedOptionsChain({
     onClose()
   }
 
-  // Extract data from store state - no double nesting needed
+  // Extract data from store state
+  // Store already handles the double-nested response structure
   const expiryData = expiryDates.data as any
   const chainData = optionsChain.data as any
   const calls = chainData?.calls || []
@@ -85,7 +89,8 @@ export function UnifiedOptionsChain({
   calls.forEach((c: any) => allStrikes.add(c.strikePrice))
   puts.forEach((p: any) => allStrikes.add(p.strikePrice))
 
-  const mergedData = Array.from(allStrikes).sort((a, b) => a - b).map(strike => {
+  // Sort descending so higher strikes appear at top
+  const mergedData = Array.from(allStrikes).sort((a, b) => b - a).map(strike => {
     const call = calls.find((c: any) => c.strikePrice === strike)
     const put = puts.find((p: any) => p.strikePrice === strike)
     return { strike, call, put }
@@ -284,6 +289,40 @@ export function UnifiedOptionsChain({
     }
   }, [filteredExpiryDates])
 
+  // Auto-scroll to current price range when options chain loads
+  useEffect(() => {
+    if (!optionsChain.isLoading && underlyingPrice && mergedData.length > 0) {
+      // Small delay to ensure DOM is fully rendered
+      const timer = setTimeout(() => {
+        const container = tableContainerRef.current
+        if (!container) return
+
+        // Find the row closest to current price
+        // Since strikes are sorted DESCENDING, we look for where strike transitions from >= to <
+        const atmIndex = mergedData.findIndex((row, idx) => {
+          const nextRow = mergedData[idx + 1]
+          if (!nextRow) return false
+          // Strikes go from high to low, so we want: current >= price AND next < price
+          return row.strike >= underlyingPrice && nextRow.strike < underlyingPrice
+        })
+
+        if (atmIndex !== -1) {
+          // Scroll to position the ATM strike in the middle of the viewport
+          const rowHeight = 50 // Approximate row height
+          const containerHeight = container.clientHeight
+          const scrollPosition = (atmIndex * rowHeight) - (containerHeight / 2) + (rowHeight * 2)
+
+          container.scrollTo({
+            top: Math.max(0, scrollPosition),
+            behavior: 'smooth'
+          })
+        }
+      }, 100)
+
+      return () => clearTimeout(timer)
+    }
+  }, [optionsChain.isLoading, underlyingPrice, mergedData.length])
+
   const handleBadgeClick = (e: React.MouseEvent, type: 'ITM' | 'ATM' | 'OTM') => {
     e.stopPropagation()
     setShowExplanation(type)
@@ -379,6 +418,7 @@ export function UnifiedOptionsChain({
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
                 <button
+                  type="button"
                   className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-primary/20 to-secondary/20 border-2 border-primary/30 hover:border-primary hover:bg-primary/10 transition-all text-white font-medium"
                 >
                   <CalendarIcon className="w-4 h-4" />
@@ -392,7 +432,7 @@ export function UnifiedOptionsChain({
                   </span>
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
+              <PopoverContent className="w-auto p-0 z-[10000] bg-dark-800 border-primary/30" align="start">
                 <Calendar
                   mode="single"
                   selected={selectedMonth}
@@ -401,7 +441,7 @@ export function UnifiedOptionsChain({
                   captionLayout="dropdown"
                   fromYear={new Date().getFullYear()}
                   toYear={new Date().getFullYear() + 2}
-                  className="rounded-md border border-primary/30"
+                  className="rounded-md border border-primary/30 bg-dark-800 text-white"
                 />
               </PopoverContent>
             </Popover>
@@ -505,7 +545,7 @@ export function UnifiedOptionsChain({
         </div>
 
         {/* Options Table - Split View */}
-        <div className="overflow-auto flex-1 min-h-0">
+        <div ref={tableContainerRef} className="overflow-auto flex-1 min-h-0">
           {optionsChain.isLoading ? (
             <div className="flex items-center justify-center py-16">
               <div className="flex flex-col items-center gap-4">
@@ -530,23 +570,23 @@ export function UnifiedOptionsChain({
               <thead className="bg-dark-900 sticky top-0 z-10">
                 {/* Section Headers */}
                 <tr className="border-b border-white/10">
-                  <th colSpan={6} className="px-4 py-2 text-center font-bold text-green-400 text-sm uppercase tracking-wide bg-gradient-to-r from-green-500/10 to-green-500/5">
+                  <th colSpan={6} className="px-4 py-2 text-center font-bold text-white text-sm uppercase tracking-wide bg-gradient-to-r from-green-500/10 to-green-500/5">
                     Calls
                   </th>
                   <th className="px-4 py-2 bg-dark-800/80"></th>
-                  <th colSpan={6} className="px-4 py-2 text-center font-bold text-red-400 text-sm uppercase tracking-wide bg-gradient-to-l from-red-500/10 to-red-500/5">
+                  <th colSpan={6} className="px-4 py-2 text-center font-bold text-white text-sm uppercase tracking-wide bg-gradient-to-l from-red-500/10 to-red-500/5">
                     Puts
                   </th>
                 </tr>
                 {/* Column Headers */}
                 <tr className="text-[10px] uppercase tracking-wider border-b-2 border-white/20">
                   {/* CALLS Side Headers - IV, OI, Vol (outer), then Ask, Mid, Bid (inner/closest to strike, right to left) */}
-                  <th className="px-3 py-3 text-left font-bold text-gray-400 bg-dark-900 w-16">IV</th>
-                  <th className="px-3 py-3 text-left font-bold text-gray-400 bg-dark-900 w-20">OI</th>
+                  <th className="px-3 py-3 text-left font-bold text-purple-400 bg-dark-900 w-16">IV</th>
+                  <th className="px-3 py-3 text-left font-bold text-cyan-400 bg-dark-900 w-20">OI</th>
                   <th className="px-3 py-3 text-left font-bold text-gray-400 bg-dark-900 w-16">Vol</th>
-                  <th className="px-4 py-3 text-right font-bold text-red-400 bg-dark-900 w-20">Ask</th>
+                  <th className="px-4 py-3 text-right font-bold text-white bg-dark-900 w-20">Ask</th>
                   <th className="px-4 py-3 text-center font-bold text-white bg-dark-900 w-20">Mid</th>
-                  <th className="px-4 py-3 text-right font-bold text-green-400 bg-dark-900 w-20">Bid</th>
+                  <th className="px-4 py-3 text-right font-bold text-white bg-dark-900 w-20">Bid</th>
 
                   {/* Strike Price Center */}
                   <th className="px-6 py-3 text-center font-bold text-white bg-gradient-to-r from-dark-800 to-dark-800 border-x-2 border-primary/30 w-28">
@@ -554,41 +594,46 @@ export function UnifiedOptionsChain({
                   </th>
 
                   {/* PUTS Side Headers - Bid, Mid, Ask (inner/closest to strike, left to right), then Vol, OI, IV (outer) */}
-                  <th className="px-4 py-3 text-left font-bold text-green-400 bg-dark-900 w-20">Bid</th>
+                  <th className="px-4 py-3 text-left font-bold text-white bg-dark-900 w-20">Bid</th>
                   <th className="px-4 py-3 text-center font-bold text-white bg-dark-900 w-20">Mid</th>
-                  <th className="px-4 py-3 text-right font-bold text-red-400 bg-dark-900 w-20">Ask</th>
+                  <th className="px-4 py-3 text-right font-bold text-white bg-dark-900 w-20">Ask</th>
                   <th className="px-3 py-3 text-right font-bold text-gray-400 bg-dark-900 w-16">Vol</th>
-                  <th className="px-3 py-3 text-right font-bold text-gray-400 bg-dark-900 w-20">OI</th>
-                  <th className="px-3 py-3 text-right font-bold text-gray-400 bg-dark-900 w-16">IV</th>
+                  <th className="px-3 py-3 text-right font-bold text-cyan-400 bg-dark-900 w-20">OI</th>
+                  <th className="px-3 py-3 text-right font-bold text-purple-400 bg-dark-900 w-16">IV</th>
                 </tr>
               </thead>
               <tbody>
                 {mergedData.map((row, idx) => {
                   const prevStrike = idx > 0 ? mergedData[idx - 1].strike : null
                   const currentStrike = row.strike
+                  // Since strikes are sorted descending, show price line when transitioning from above to below current price
                   const shouldShowPriceLine = underlyingPrice && prevStrike &&
-                    prevStrike < underlyingPrice && currentStrike >= underlyingPrice
+                    prevStrike >= underlyingPrice && currentStrike < underlyingPrice
 
                   const { strike, call, put } = row
                   const isAtPrice = underlyingPrice && Math.abs(strike - underlyingPrice) < underlyingPrice * 0.02
 
                   // Process call data - API already returns per-contract pricing
-                  const callBid = call ? (call.bid || 0) : 0
-                  const callAsk = call ? (call.ask || 0) : 0
-                  // Only calculate mid if both bid and ask are valid (> 0)
-                  const callMid = (callBid > 0 && callAsk > 0) ? (callBid + callAsk) / 2 : (callBid > 0 ? callBid : callAsk)
+                  const callBid = call?.bid ?? null
+                  const callAsk = call?.ask ?? null
+                  // Only calculate mid if both bid and ask exist
+                  const callMid = (callBid !== null && callAsk !== null) ? (callBid + callAsk) / 2 : (callBid ?? callAsk)
                   const callITM = call && underlyingPrice && strike < underlyingPrice
                   const callATM = call && isAtPrice
                   const callOTM = call && !callITM && !callATM
 
                   // Process put data - API already returns per-contract pricing
-                  const putBid = put ? (put.bid || 0) : 0
-                  const putAsk = put ? (put.ask || 0) : 0
-                  // Only calculate mid if both bid and ask are valid (> 0)
-                  const putMid = (putBid > 0 && putAsk > 0) ? (putBid + putAsk) / 2 : (putBid > 0 ? putBid : putAsk)
+                  const putBid = put?.bid ?? null
+                  const putAsk = put?.ask ?? null
+                  // Only calculate mid if both bid and ask exist
+                  const putMid = (putBid !== null && putAsk !== null) ? (putBid + putAsk) / 2 : (putBid ?? putAsk)
                   const putITM = put && underlyingPrice && strike > underlyingPrice
                   const putATM = put && isAtPrice
                   const putOTM = put && !putITM && !putATM
+
+                  // Check if we have actual data for this row
+                  const hasCallData = call !== undefined
+                  const hasPutData = put !== undefined
 
                   // Row background coloring based on moneyness with hover states
                   const getRowBgClass = () => {
@@ -611,57 +656,57 @@ export function UnifiedOptionsChain({
                       {/* CALLS Side - Left: IV, OI, Vol (outer), then Ask, Mid, Bid (inner/closest to strike, right to left) */}
                       {/* IV */}
                       <td
-                        className={`px-3 py-3 text-left text-xs cursor-pointer ${
-                          callITM ? 'text-gray-200' : 'text-gray-500'
-                        }`}
+                        className="px-3 py-3 text-left text-xs cursor-pointer text-purple-400"
                         onClick={() => call && handleRowClick(call, 'call')}
                       >
                         {call?.impliedVolatility ? `${(call.impliedVolatility * 100).toFixed(1)}%` : '—'}
                       </td>
                       {/* OI */}
                       <td
-                        className={`px-3 py-3 text-left text-xs cursor-pointer ${
-                          callITM ? 'text-gray-200' : 'text-gray-500'
-                        }`}
+                        className="px-3 py-3 text-left text-xs cursor-pointer text-cyan-400"
                         onClick={() => call && handleRowClick(call, 'call')}
                       >
                         {call?.openInterest?.toLocaleString() || '—'}
                       </td>
                       {/* Vol */}
                       <td
-                        className={`px-3 py-3 text-left text-xs cursor-pointer ${
-                          callITM ? 'text-gray-200' : 'text-gray-500'
-                        }`}
+                        className="px-3 py-3 text-left text-xs cursor-pointer text-gray-400"
                         onClick={() => call && handleRowClick(call, 'call')}
                       >
                         {call?.volume?.toLocaleString() || '—'}
                       </td>
                       {/* Ask */}
                       <td
-                        className={`px-4 py-3 text-right font-semibold text-sm cursor-pointer ${
-                          callITM ? 'text-red-400' : 'text-red-500/70'
+                        className={`px-4 py-3 text-right font-semibold text-sm text-white ${
+                          !hasCallData ? 'opacity-40' : 'cursor-pointer'
                         }`}
-                        onClick={() => call && callAsk > 0 && handleRowClick(call, 'call')}
+                        onClick={() => call && callAsk !== null && handleRowClick(call, 'call')}
                       >
-                        {call && callAsk > 0 ? `$${callAsk.toFixed(2)}` : '—'}
+                        <span className={!hasCallData ? 'italic text-xs' : ''}>
+                          {!hasCallData ? 'Not quoted' : (call && callAsk !== null ? `$${callAsk.toFixed(2)}` : '—')}
+                        </span>
                       </td>
                       {/* Mid */}
                       <td
-                        className={`px-4 py-3 text-center font-bold text-sm cursor-pointer ${
-                          callITM ? 'text-white' : 'text-gray-300'
+                        className={`px-4 py-3 text-center font-bold text-sm text-white ${
+                          !hasCallData ? 'opacity-40' : 'cursor-pointer'
                         }`}
-                        onClick={() => call && callMid > 0 && handleRowClick(call, 'call')}
+                        onClick={() => call && callMid !== null && handleRowClick(call, 'call')}
                       >
-                        {call && callMid > 0 ? `$${callMid.toFixed(2)}` : '—'}
+                        <span className={!hasCallData ? 'italic text-xs' : ''}>
+                          {!hasCallData ? 'Not quoted' : (call && callMid !== null ? `$${callMid.toFixed(2)}` : '—')}
+                        </span>
                       </td>
                       {/* Bid */}
                       <td
-                        className={`px-4 py-3 text-right font-semibold text-sm cursor-pointer ${
-                          callITM ? 'text-green-400' : 'text-green-500/70'
+                        className={`px-4 py-3 text-right font-semibold text-sm text-white ${
+                          !hasCallData ? 'opacity-40' : 'cursor-pointer'
                         }`}
-                        onClick={() => call && callBid > 0 && handleRowClick(call, 'call')}
+                        onClick={() => call && callBid !== null && handleRowClick(call, 'call')}
                       >
-                        {call && callBid > 0 ? `$${callBid.toFixed(2)}` : '—'}
+                        <span className={!hasCallData ? 'italic text-xs' : ''}>
+                          {!hasCallData ? 'Not quoted' : (call && callBid !== null ? `$${callBid.toFixed(2)}` : '—')}
+                        </span>
                       </td>
 
                       {/* Strike Price - Center */}
@@ -680,54 +725,54 @@ export function UnifiedOptionsChain({
                       {/* PUTS Side - Right: Bid, Mid, Ask (inner/closest to strike), then Vol, OI, IV (outer) */}
                       {/* Bid */}
                       <td
-                        className={`px-4 py-3 text-left font-semibold text-sm cursor-pointer ${
-                          putITM ? 'text-green-400' : 'text-green-500/70'
+                        className={`px-4 py-3 text-left font-semibold text-sm text-red-400 ${
+                          !hasPutData ? 'opacity-40' : 'cursor-pointer'
                         }`}
-                        onClick={() => put && putBid > 0 && handleRowClick(put, 'put')}
+                        onClick={() => put && putBid !== null && handleRowClick(put, 'put')}
                       >
-                        {put && putBid > 0 ? `$${putBid.toFixed(2)}` : '—'}
+                        <span className={!hasPutData ? 'text-white italic text-xs' : ''}>
+                          {!hasPutData ? 'Not quoted' : (put && putBid !== null ? `$${putBid.toFixed(2)}` : '—')}
+                        </span>
                       </td>
                       {/* Mid */}
                       <td
-                        className={`px-4 py-3 text-center font-bold text-sm cursor-pointer ${
-                          putITM ? 'text-white' : 'text-gray-300'
+                        className={`px-4 py-3 text-center font-bold text-sm text-red-400 ${
+                          !hasPutData ? 'opacity-40' : 'cursor-pointer'
                         }`}
-                        onClick={() => put && putMid > 0 && handleRowClick(put, 'put')}
+                        onClick={() => put && putMid !== null && handleRowClick(put, 'put')}
                       >
-                        {put && putMid > 0 ? `$${putMid.toFixed(2)}` : '—'}
+                        <span className={!hasPutData ? 'text-white italic text-xs' : ''}>
+                          {!hasPutData ? 'Not quoted' : (put && putMid !== null ? `$${putMid.toFixed(2)}` : '—')}
+                        </span>
                       </td>
                       {/* Ask */}
                       <td
-                        className={`px-4 py-3 text-right font-semibold text-sm cursor-pointer ${
-                          putITM ? 'text-red-400' : 'text-red-500/70'
+                        className={`px-4 py-3 text-right font-semibold text-sm text-red-400 ${
+                          !hasPutData ? 'opacity-40' : 'cursor-pointer'
                         }`}
-                        onClick={() => put && putAsk > 0 && handleRowClick(put, 'put')}
+                        onClick={() => put && putAsk !== null && handleRowClick(put, 'put')}
                       >
-                        {put && putAsk > 0 ? `$${putAsk.toFixed(2)}` : '—'}
+                        <span className={!hasPutData ? 'text-white italic text-xs' : ''}>
+                          {!hasPutData ? 'Not quoted' : (put && putAsk !== null ? `$${putAsk.toFixed(2)}` : '—')}
+                        </span>
                       </td>
                       {/* Vol */}
                       <td
-                        className={`px-3 py-3 text-right text-xs cursor-pointer ${
-                          putITM ? 'text-gray-200' : 'text-gray-500'
-                        }`}
+                        className="px-3 py-3 text-right text-xs cursor-pointer text-gray-400"
                         onClick={() => put && handleRowClick(put, 'put')}
                       >
                         {put?.volume?.toLocaleString() || '—'}
                       </td>
                       {/* OI */}
                       <td
-                        className={`px-3 py-3 text-right text-xs cursor-pointer ${
-                          putITM ? 'text-gray-200' : 'text-gray-500'
-                        }`}
+                        className="px-3 py-3 text-right text-xs cursor-pointer text-cyan-400"
                         onClick={() => put && handleRowClick(put, 'put')}
                       >
                         {put?.openInterest?.toLocaleString() || '—'}
                       </td>
                       {/* IV */}
                       <td
-                        className={`px-3 py-3 text-right text-xs cursor-pointer ${
-                          putITM ? 'text-gray-200' : 'text-gray-500'
-                        }`}
+                        className="px-3 py-3 text-right text-xs cursor-pointer text-purple-400"
                         onClick={() => put && handleRowClick(put, 'put')}
                       >
                         {put?.impliedVolatility ? `${(put.impliedVolatility * 100).toFixed(1)}%` : '—'}

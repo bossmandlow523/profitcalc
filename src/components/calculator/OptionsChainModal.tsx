@@ -21,7 +21,8 @@ export function OptionsChainModal({ symbol, onOptionSelect, onClose, optionType 
   }, [symbol, expiryDates.data, fetchExpiryDates])
 
   useEffect(() => {
-    // Extract data from store state - no double nesting needed
+    // Extract data from store state
+    // Store already handles the double-nested response structure
     const expiryData = expiryDates.data as any
     if (expiryData?.expiryDates && expiryData.expiryDates.length > 0 && !selectedExpiryTab) {
       const firstExpiry = expiryData.expiryDates[0].date
@@ -47,7 +48,8 @@ export function OptionsChainModal({ symbol, onOptionSelect, onClose, optionType 
     return new Date(year, month - 1, day)
   }
 
-  // Extract data from store state - no double nesting needed
+  // Extract data from store state
+  // Store already handles the double-nested response structure
   const expiryData = expiryDates.data as any
   const chainData = optionsChain.data as any
   const optionsList = optionType === 'call' ? chainData?.calls : chainData?.puts

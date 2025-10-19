@@ -182,10 +182,14 @@ export const useMarketDataStore = create<MarketDataStore>((set, get) => ({
         includeGreeks: true,
       });
 
+      // Handle double-nested response structure from backend
+      // Backend returns: { data: { data: { calls, puts, ... } } }
+      const actualData = (response.data as any).data || response.data;
+
       set({
         optionsChain: {
           status: 'success',
-          data: response.data,
+          data: actualData,
           error: null,
           timestamp: response.timestamp,
           isLoading: false,
@@ -229,10 +233,14 @@ export const useMarketDataStore = create<MarketDataStore>((set, get) => ({
         includeMonthlies: true,
       });
 
+      // Handle double-nested response structure from backend
+      // Backend returns: { data: { data: { expiryDates, ... } } }
+      const actualData = (response.data as any).data || response.data;
+
       set({
         expiryDates: {
           status: 'success',
-          data: response.data,
+          data: actualData,
           error: null,
           timestamp: response.timestamp,
           isLoading: false,

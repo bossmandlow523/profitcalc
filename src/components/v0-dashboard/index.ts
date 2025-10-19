@@ -1,13 +1,4 @@
-export { DashboardGrid } from "./dashboard-grid"
-export { ChartCard } from "./chart-card"
-export { MetricCard } from "./metric-card"
-export { ActivityCard } from "./activity-card"
-export { StatsCard } from "./stats-card"
-export { PerformanceCard } from "./performance-card"
-export { DashboardDemo } from "./DashboardDemo"
-export { OptionsChartLayout } from "./OptionsChartLayout"
-
-// New flexible layout system
+// Flexible layout system - minimal exports for DashboardCharts component
 export { ChartLayoutContainer } from "./ChartLayoutContainer"
 export {
   OptionsChartGrid,
@@ -18,9 +9,4 @@ export {
   WideChartArea,
   FullWidthArea,
 } from "./OptionsChartGrid"
-export {
-  OptionsChartLayoutExample1,
-  OptionsChartLayoutExample2,
-  OptionsChartLayoutExample3,
-} from "./OptionsChartLayoutExample"
 

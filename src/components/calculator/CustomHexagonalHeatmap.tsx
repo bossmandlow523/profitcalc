@@ -3,16 +3,8 @@
  * SVG-based heatmap with hexagonal cells - no MUI X Pro license required
  */
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { red, green, orange } from '@mui/material/colors'
-
-interface HeatmapCell {
-  x: number
-  y: number
-  value: number
-  priceLabel?: string
-  dateLabel?: string
-}
 
 interface CustomHexagonalHeatmapProps {
   data: number[][] // [priceIndex][dateIndex]
@@ -32,12 +24,59 @@ export function CustomHexagonalHeatmap({
   yLabels,
   minValue,
   maxValue,
-  width = 900,
-  height = 450,
+  width,
+  height,
   monthHeader,
   showAllLabels = false
 }: CustomHexagonalHeatmapProps) {
   const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number } | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [dimensions, setDimensions] = useState({ width: 900, height: 450 })
+
+  // Observe container size changes
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const { width: containerWidth, height: containerHeight } =
+          containerRef.current.getBoundingClientRect()
+
+        // Only update if we have valid dimensions
+        if (containerWidth > 0 && containerHeight > 0) {
+          // Use provided dimensions or fall back to container size with limits
+          // Increased minimum by 25% total: 600 -> 750, 400 -> 500
+          // Cap width at 1500px (1200 * 1.25) and height at 750px (600 * 1.25) to prevent excessive growth
+          const finalWidth = width || Math.min(Math.max(containerWidth, 750), 1500)
+          const finalHeight = height || Math.min(Math.max(containerHeight, 500), 750)
+
+          setDimensions({
+            width: finalWidth,
+            height: finalHeight
+          })
+        }
+      }
+    }
+
+    // Delay initial measurement to ensure container is rendered
+    const timeoutId = setTimeout(updateDimensions, 0)
+
+    // Set up ResizeObserver
+    const resizeObserver = new ResizeObserver(() => {
+      // Debounce resize events
+      requestAnimationFrame(updateDimensions)
+    })
+    resizeObserver.observe(containerRef.current)
+
+    // Also listen to window resize
+    window.addEventListener('resize', updateDimensions)
+
+    return () => {
+      clearTimeout(timeoutId)
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', updateDimensions)
+    }
+  }, [width, height])
 
   if (!data || data.length === 0 || !xLabels || !yLabels) {
     return <div className="text-gray-400">No data available</div>
@@ -46,24 +85,27 @@ export function CustomHexagonalHeatmap({
   const rows = data.length
   const cols = xLabels.length
 
-  // Calculate cell dimensions
-  const leftPadding = 80
-  const rightPadding = 120 // Space for legend
-  const topPadding = 80
-  const bottomPadding = 40
+  // Calculate cell dimensions - make padding responsive
+  const svgWidth = dimensions.width
+  const svgHeight = dimensions.height
+
+  const leftPadding = Math.max(60, svgWidth * 0.08)
+  const rightPadding = Math.max(100, svgWidth * 0.12) // Space for legend
+  const topPadding = Math.max(60, svgHeight * 0.12)
+  const bottomPadding = Math.max(30, svgHeight * 0.05)
 
   // Honeycomb hexagon geometry
   // For a perfect honeycomb, hexagons need to overlap vertically
   // Horizontal spacing: width = radius * sqrt(3)
   // Vertical spacing: height = radius * 1.5 (3/4 overlap)
-  const availableWidth = width - leftPadding - rightPadding
-  const availableHeight = height - topPadding - bottomPadding
+  const availableWidth = svgWidth - leftPadding - rightPadding
+  const availableHeight = svgHeight - topPadding - bottomPadding
 
   // Calculate radius based on space constraints
   // For honeycomb: horizontal = cols * (radius * sqrt(3)), vertical = rows * (radius * 1.5)
   const radiusFromWidth = availableWidth / (cols * Math.sqrt(3))
   const radiusFromHeight = availableHeight / (rows * 1.5 + 0.5) // +0.5 for top/bottom half
-  const hexRadius = Math.min(radiusFromWidth, radiusFromHeight) * 0.95
+  const hexRadius = Math.min(radiusFromWidth, radiusFromHeight) * 0.99 // Increased from 0.98 to utilize the larger container
 
   // Hexagon dimensions
   const hexWidth = hexRadius * Math.sqrt(3)
@@ -145,21 +187,22 @@ export function CustomHexagonalHeatmap({
    * Generate legend gradient stops
    */
   const legendStops = [
-    { offset: '0%', color: red[700], label: minValue.toFixed(0) },
+    { offset: '0%', color: red[700], label: minValue?.toFixed(0) || '0' },
     { offset: '50%', color: orange[500], label: '0' },
-    { offset: '100%', color: green[700], label: maxValue.toFixed(0) }
+    { offset: '100%', color: green[700], label: maxValue?.toFixed(0) || '0' }
   ]
 
   return (
-    <div className="w-full">
+    <div ref={containerRef} className="w-full h-full max-h-full flex flex-col overflow-hidden">
       {/* Month Header */}
       {monthHeader && (
-        <div className="text-left text-sm text-[#B4B7C5] py-2 pl-20">
+        <div className="text-left text-sm text-[#B4B7C5] py-2 pl-20 flex-shrink-0">
           {monthHeader}
         </div>
       )}
 
-      <svg width={width} height={height} className="overflow-visible">
+      <div className="flex-1 min-h-0 flex items-center justify-center">
+        <svg width={svgWidth} height={svgHeight} className="max-w-full max-h-full">
         <defs>
           {/* Gradient for legend */}
           <linearGradient id="heatmapGradient" x1="0%" y1="100%" x2="0%" y2="0%">
@@ -216,10 +259,10 @@ export function CustomHexagonalHeatmap({
 
             const isHovered = hoveredCell?.row === rowIdx && hoveredCell?.col === colIdx
             const color = getColor(value)
-            const textColor = value > 0 ? 'white' : 'rgba(255, 255, 255, 0.9)'
+            const textColor = 'white' // Always use white for maximum contrast
 
             // Smart label visibility: only show if hex is big enough or on hover
-            const minRadiusForLabel = 12
+            const minRadiusForLabel = 10 // Reduced from 12 to show labels more often
             const shouldShowLabel = showAllLabels || isHovered || hexRadius >= minRadiusForLabel
 
             return (
@@ -243,10 +286,12 @@ export function CustomHexagonalHeatmap({
                     textAnchor="middle"
                     dominantBaseline="middle"
                     fill={textColor}
-                    fontSize={isHovered ? '0.75em' : '0.55em'}
-                    fontWeight={isHovered ? '600' : '500'}
+                    fontSize={isHovered ? '0.9em' : '0.7em'}
+                    fontWeight="700"
                     pointerEvents="none"
-                    opacity={isHovered ? 1 : 0.85}
+                    style={{
+                      textShadow: '0 0 3px rgba(0,0,0,0.8), 0 0 6px rgba(0,0,0,0.6)'
+                    }}
                   >
                     {formatValue(value)}
                   </text>
@@ -294,13 +339,13 @@ export function CustomHexagonalHeatmap({
         )}
 
         {/* Legend */}
-        <g transform={`translate(${width - rightPadding + 40}, ${topPadding})`}>
+        <g transform={`translate(${svgWidth - rightPadding + 40}, ${topPadding})`}>
           {/* Legend gradient bar */}
           <rect
             x={0}
             y={0}
             width={20}
-            height={height - topPadding - bottomPadding}
+            height={svgHeight - topPadding - bottomPadding}
             fill="url(#heatmapGradient)"
             stroke="#333333"
             strokeWidth={1}
@@ -314,25 +359,25 @@ export function CustomHexagonalHeatmap({
             fontSize="11"
             dominantBaseline="hanging"
           >
-            ${legendStops[2].label}
+            ${legendStops[2]?.label || '0'}
           </text>
           <text
             x={30}
-            y={(height - topPadding - bottomPadding) / 2}
+            y={(svgHeight - topPadding - bottomPadding) / 2}
             fill="#B4B7C5"
             fontSize="11"
             dominantBaseline="middle"
           >
-            ${legendStops[1].label}
+            ${legendStops[1]?.label || '0'}
           </text>
           <text
             x={30}
-            y={height - topPadding - bottomPadding}
+            y={svgHeight - topPadding - bottomPadding}
             fill="#B4B7C5"
             fontSize="11"
-            dominantBaseline="baseline"
+            dominantBaseline="auto"
           >
-            ${legendStops[0].label}
+            ${legendStops[0]?.label || '0'}
           </text>
         </g>
 
@@ -341,19 +386,20 @@ export function CustomHexagonalHeatmap({
           x1={leftPadding}
           y1={topPadding}
           x2={leftPadding}
-          y2={height - bottomPadding}
+          y2={svgHeight - bottomPadding}
           stroke="#333333"
           strokeWidth={1}
         />
         <line
           x1={leftPadding}
           y1={topPadding}
-          x2={width - rightPadding}
+          x2={svgWidth - rightPadding}
           y2={topPadding}
           stroke="#333333"
           strokeWidth={1}
         />
       </svg>
+      </div>
     </div>
   )
 }

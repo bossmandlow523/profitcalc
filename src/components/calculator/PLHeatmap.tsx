@@ -163,18 +163,10 @@ export function PLHeatmap({
 
   if (isLoading) {
     return (
-      <div className={`flex flex-col h-full ${className}`}>
-        <div className="dashboard-card-header">
-          <h3 className="dashboard-card-title">P&L Heatmap</h3>
-          <p className="dashboard-card-subtitle">
-            Profit/Loss across price and time
-          </p>
-        </div>
-        <div className="flex-1 flex items-center justify-center bg-[#0a0a0f] border-2 border-dashed border-[#333333] rounded min-h-[200px]">
-          <div className="flex flex-col items-center gap-4">
-            <CircularProgressCombined size={80} thickness={6} />
-            <p className="text-sm text-gray-400">Generating heatmap data...</p>
-          </div>
+      <div className={`flex items-center justify-center h-full ${className}`}>
+        <div className="flex flex-col items-center gap-4">
+          <CircularProgressCombined size={80} thickness={6} />
+          <p className="text-sm text-gray-400">Generating heatmap data...</p>
         </div>
       </div>
     )
@@ -182,21 +174,16 @@ export function PLHeatmap({
 
   if (!heatmapData || heatmapData.values.length === 0) {
     return (
-      <div className={`flex flex-col ${className}`}>
-        <div className="dashboard-card-header">
-          <h3 className="dashboard-card-title">P&L Heatmap</h3>
-          <p className="dashboard-card-subtitle">
-            Add option legs to see P/L analysis
-          </p>
-        </div>
+      <div className={`flex items-center justify-center h-full ${className}`}>
+        <p className="text-sm text-gray-400">Add option legs to see P/L analysis</p>
       </div>
     )
   }
 
   return (
-    <div className={`flex flex-col ${className}`}>
+    <div className={`flex flex-col h-full w-full ${className}`}>
       {/* Heatmap */}
-      <div className="flex flex-col w-full pl-2 pr-2">
+      <div className="flex-1 flex flex-col w-full min-h-0 overflow-hidden">
         <CustomHexagonalHeatmap
           data={heatmapData.values}
           xLabels={xAxisData}
@@ -209,7 +196,7 @@ export function PLHeatmap({
 
       {/* Statistics */}
       {stats && (
-        <div className="flex w-full pl-6 pr-6 justify-between pb-2 pt-4">
+        <div className="flex-shrink-0 flex w-full pl-6 pr-6 justify-between pb-2 pt-4">
           <div className="flex flex-col gap-1 w-1/2">
             <span className="text-base text-white">Max Profit</span>
             <div className="flex items-center gap-2">
@@ -269,7 +256,7 @@ export function PLHeatmap({
 
       {/* Detailed Metrics - Compact Grid */}
       {stats && (
-        <div className="grid grid-cols-3 gap-3 px-6 pb-4 pt-2">
+        <div className="flex-shrink-0 grid grid-cols-3 gap-3 px-6 pb-4 pt-2">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

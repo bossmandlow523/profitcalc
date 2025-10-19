@@ -26,7 +26,7 @@ export function OptionsChartGrid({
   className,
 }: OptionsChartGridProps) {
   const layoutClasses: Record<GridLayout, string> = {
-    default: "grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4 lg:grid-rows-3",
+    default: "grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4 lg:grid-rows-[repeat(3,minmax(250px,300px))]",
     "2-column": "grid grid-cols-1 gap-3 md:grid-cols-2",
     "3-column": "grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3",
     "sidebar-left": "grid grid-cols-1 gap-3 lg:grid-cols-4",
