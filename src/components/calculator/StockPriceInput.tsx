@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { RefreshCw, TrendingUp, TrendingDown } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { NumberInput } from '@/components/ui/number-input';
 import { useCalculatorStore } from '@/lib/store/calculator-store';
 import { useMarketDataStore } from '@/lib/store/market-data-store';
 
@@ -43,22 +43,21 @@ export function StockPriceInput() {
         )}
       </Label>
 
-      <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-          $
-        </span>
-        <Input
-          id="stock-price"
-          type="number"
-          step="0.01"
-          min="0"
-          value={inputs.currentStockPrice}
-          onChange={(e) => setInputs({ currentStockPrice: Number(e.target.value) })}
-          className="pl-7"
-          placeholder="0.00"
-          disabled={stockQuote.isLoading}
-        />
-      </div>
+      <NumberInput
+        id="stock-price"
+        placeholder="0.00"
+        value={inputs.currentStockPrice.toString()}
+        onValueChange={(value) => setInputs({ currentStockPrice: value })}
+        startContent={<span className="text-muted-foreground">$</span>}
+        step={0.01}
+        minValue={0}
+        isDisabled={stockQuote.isLoading}
+        aria-label="Current stock price"
+        formatOptions={{
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }}
+      />
 
       {/* Live data indicator */}
       {hasLiveData && (

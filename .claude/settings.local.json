@@ -33,7 +33,15 @@
       "Bash(del \"c:\\Users\\nicks\\OneDrive\\Desktop\\calc\\src\\components\\home\\ColoredTextFlip.tsx\")",
       "Bash(python -m pip install:*)",
       "Bash(python:*)",
-      "Bash(curl \"http://localhost:8000/api/stocks/EOSE/quote\")"
+      "Bash(curl \"http://localhost:8000/api/stocks/EOSE/quote\")",
+      "Bash(curl -s \"http://localhost:8000/api/options/AAPL/chain?expiryDate=2025-10-17\")",
+      "Bash(for file in break-even.ts chart-data.ts greeks.ts multi-leg.ts validators.ts)",
+      "Bash(do echo \"Checking $file...\")",
+      "Bash(done)",
+      "Bash(for file in greeks.ts multi-leg.ts validators.ts)",
+      "Bash(do sed -i \"s/import { CalculationError, ErrorCode } from ''''..\\/types\\/errors''''/import { CalculationError } from ''''..\\/types\\/errors''''/g\" $file)",
+      "Bash(head:*)",
+      "Bash(curl:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

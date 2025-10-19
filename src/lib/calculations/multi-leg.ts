@@ -3,16 +3,30 @@
  * Handles calculations for complex options strategies with multiple legs
  */
 
-import { OptionType, Position, OptionLeg } from '../types';
+import { OptionType, Position, OptionLeg, ErrorCode } from '../types';
 import { CONTRACT_MULTIPLIER } from '../constants/defaults';
 import { calcLegPL } from './basic-pl';
-import { CalculationError, ErrorCode } from '../types/errors';
+import { CalculationError } from '../types/errors';
+import { detectStrategy, StrategyType } from './strategy-detector';
+import {
+  bullCallSpreadPnl,
+  bearCallSpreadPnl,
+  bullPutSpreadPnl,
+  bearPutSpreadPnl,
+  ironCondorPnl,
+  longCallButterflyPnl,
+  longStraddlePnl,
+  longStranglePnl,
+} from './strategy-formulas';
+import { toContractPayoff } from './payoff-helpers';
 
 /**
  * Calculate total profit/loss across all legs at a given stock price
+ * Uses optimized formulas when a known strategy is detected
  *
  * @param legs - Array of option legs
  * @param stockPrice - Stock price to evaluate at
+ * @param useOptimized - Whether to use optimized formulas (default true)
  * @returns Total P/L in dollars
  *
  * @example
@@ -22,14 +36,189 @@ import { CalculationError, ErrorCode } from '../types/errors';
  * ];
  * calcTotalPL(legs, 60); // Bull call spread profit
  */
-export function calcTotalPL(legs: OptionLeg[], stockPrice: number): number {
+export function calcTotalPL(legs: OptionLeg[], stockPrice: number, useOptimized: boolean = true): number {
   if (legs.length === 0) {
     return 0;
   }
 
+  // Try optimized formulas for known strategies
+  if (useOptimized && legs.length >= 2 && legs.length <= 4) {
+    const optimizedResult = tryOptimizedCalculation(legs, stockPrice);
+    if (optimizedResult !== null) {
+      return optimizedResult;
+    }
+  }
+
+  // Fallback to generic leg-by-leg calculation
   return legs.reduce((total, leg) => {
     return total + calcLegPL(leg, stockPrice);
   }, 0);
+}
+
+/**
+ * Try to use optimized strategy-specific formulas
+ * Returns null if strategy not recognized or can't be optimized
+ */
+function tryOptimizedCalculation(legs: OptionLeg[], stockPrice: number): number | null {
+  const detection = detectStrategy(legs);
+
+  // Only use optimization if we're confident in detection
+  if (detection.confidence < 0.8) {
+    return null;
+  }
+
+  // Check if all legs have same quantity (simplifies calculations)
+  if (legs.length === 0 || !legs[0]) {
+    return null;
+  }
+
+  const allSameQuantity = legs.every((leg) => leg.quantity === legs[0]!.quantity);
+  if (!allSameQuantity) {
+    return null; // For now, only optimize equal-quantity strategies
+  }
+
+  const qty = legs[0].quantity;
+
+  try {
+    switch (detection.type) {
+      case StrategyType.BULL_CALL_SPREAD: {
+        const longLeg = legs.find((l) => l.position === Position.LONG)!;
+        const shortLeg = legs.find((l) => l.position === Position.SHORT)!;
+        const perSharePL = bullCallSpreadPnl(
+          stockPrice,
+          longLeg.strikePrice,
+          shortLeg.strikePrice,
+          longLeg.premium / CONTRACT_MULTIPLIER,
+          shortLeg.premium / CONTRACT_MULTIPLIER
+        );
+        return toContractPayoff(perSharePL, qty, CONTRACT_MULTIPLIER);
+      }
+
+      case StrategyType.BEAR_CALL_SPREAD: {
+        const shortLeg = legs.find((l) => l.position === Position.SHORT)!;
+        const longLeg = legs.find((l) => l.position === Position.LONG)!;
+        const perSharePL = bearCallSpreadPnl(
+          stockPrice,
+          shortLeg.strikePrice,
+          longLeg.strikePrice,
+          shortLeg.premium / CONTRACT_MULTIPLIER,
+          longLeg.premium / CONTRACT_MULTIPLIER
+        );
+        return toContractPayoff(perSharePL, qty, CONTRACT_MULTIPLIER);
+      }
+
+      case StrategyType.BULL_PUT_SPREAD: {
+        const shortLeg = legs.find((l) => l.position === Position.SHORT)!;
+        const longLeg = legs.find((l) => l.position === Position.LONG)!;
+        // In bull put spread, short has higher strike
+        const Kh = Math.max(shortLeg.strikePrice, longLeg.strikePrice);
+        const Kl = Math.min(shortLeg.strikePrice, longLeg.strikePrice);
+        const perSharePL = bullPutSpreadPnl(
+          stockPrice,
+          Kh,
+          Kl,
+          shortLeg.premium / CONTRACT_MULTIPLIER,
+          longLeg.premium / CONTRACT_MULTIPLIER
+        );
+        return toContractPayoff(perSharePL, qty, CONTRACT_MULTIPLIER);
+      }
+
+      case StrategyType.BEAR_PUT_SPREAD: {
+        const longLeg = legs.find((l) => l.position === Position.LONG)!;
+        const shortLeg = legs.find((l) => l.position === Position.SHORT)!;
+        // In bear put spread, long has higher strike
+        const Kh = Math.max(longLeg.strikePrice, shortLeg.strikePrice);
+        const Kl = Math.min(longLeg.strikePrice, shortLeg.strikePrice);
+        const perSharePL = bearPutSpreadPnl(
+          stockPrice,
+          Kh,
+          Kl,
+          longLeg.premium / CONTRACT_MULTIPLIER,
+          shortLeg.premium / CONTRACT_MULTIPLIER
+        );
+        return toContractPayoff(perSharePL, qty, CONTRACT_MULTIPLIER);
+      }
+
+      case StrategyType.LONG_STRADDLE: {
+        const call = legs.find((l) => l.optionType === OptionType.CALL)!;
+        const put = legs.find((l) => l.optionType === OptionType.PUT)!;
+        const perSharePL = longStraddlePnl(
+          stockPrice,
+          call.strikePrice,
+          call.premium / CONTRACT_MULTIPLIER,
+          put.premium / CONTRACT_MULTIPLIER
+        );
+        return toContractPayoff(perSharePL, qty, CONTRACT_MULTIPLIER);
+      }
+
+      case StrategyType.LONG_STRANGLE: {
+        const call = legs.find((l) => l.optionType === OptionType.CALL)!;
+        const put = legs.find((l) => l.optionType === OptionType.PUT)!;
+        const perSharePL = longStranglePnl(
+          stockPrice,
+          call.strikePrice,
+          call.premium / CONTRACT_MULTIPLIER,
+          put.strikePrice,
+          put.premium / CONTRACT_MULTIPLIER
+        );
+        return toContractPayoff(perSharePL, qty, CONTRACT_MULTIPLIER);
+      }
+
+      case StrategyType.IRON_CONDOR: {
+        const puts = legs.filter((l) => l.optionType === OptionType.PUT);
+        const calls = legs.filter((l) => l.optionType === OptionType.CALL);
+        const longPut = puts.find((l) => l.position === Position.LONG)!;
+        const shortPut = puts.find((l) => l.position === Position.SHORT)!;
+        const shortCall = calls.find((l) => l.position === Position.SHORT)!;
+        const longCall = calls.find((l) => l.position === Position.LONG)!;
+
+        const perSharePL = ironCondorPnl(
+          stockPrice,
+          longPut.strikePrice,
+          shortPut.strikePrice,
+          shortCall.strikePrice,
+          longCall.strikePrice,
+          longPut.premium / CONTRACT_MULTIPLIER,
+          shortPut.premium / CONTRACT_MULTIPLIER,
+          shortCall.premium / CONTRACT_MULTIPLIER,
+          longCall.premium / CONTRACT_MULTIPLIER
+        );
+        return toContractPayoff(perSharePL, qty, CONTRACT_MULTIPLIER);
+      }
+
+      case StrategyType.BUTTERFLY: {
+        // Butterfly has 3 legs with specific pattern
+        if (legs.length === 3) {
+          const sortedByStrike = [...legs].sort((a, b) => a.strikePrice - b.strikePrice);
+          const leg1 = sortedByStrike[0];
+          const leg2 = sortedByStrike[1];
+          const leg3 = sortedByStrike[2];
+
+          if (!leg1 || !leg2 || !leg3) {
+            return null;
+          }
+
+          const perSharePL = longCallButterflyPnl(
+            stockPrice,
+            leg1.strikePrice,
+            leg2.strikePrice,
+            leg3.strikePrice,
+            leg1.premium / CONTRACT_MULTIPLIER,
+            leg2.premium / CONTRACT_MULTIPLIER,
+            leg3.premium / CONTRACT_MULTIPLIER
+          );
+          return toContractPayoff(perSharePL, qty, CONTRACT_MULTIPLIER);
+        }
+        return null;
+      }
+
+      default:
+        return null;
+    }
+  } catch (error) {
+    console.warn('Optimized calculation failed, falling back to generic:', error);
+    return null;
+  }
 }
 
 /**
@@ -37,17 +226,18 @@ export function calcTotalPL(legs: OptionLeg[], stockPrice: number): number {
  * Negative = net debit (cost to enter)
  * Positive = net credit (receive premium)
  *
- * @param legs - Array of option legs
+ * @param legs - Array of option legs (premium is per-contract cost)
  * @returns Initial cost (negative) or credit (positive) in dollars
  *
  * @example
- * // Bull call spread: Buy $50 call for $3, Sell $55 call for $1
+ * // Bull call spread: Buy $50 call for $300, Sell $55 call for $100
  * // Net debit = -$200
  * calcInitialCost(legs); // returns -200
  */
 export function calcInitialCost(legs: OptionLeg[]): number {
   return legs.reduce((total, leg) => {
-    const premium = leg.premium * CONTRACT_MULTIPLIER * leg.quantity;
+    // Premium is per-contract cost, so just multiply by quantity
+    const premium = leg.premium * leg.quantity;
 
     // Long positions cost money (negative)
     // Short positions credit money (positive)
@@ -111,22 +301,32 @@ export function calcMaxLoss(
   legs: OptionLeg[],
   currentStockPrice: number
 ): number | null {
+  console.log('[calcMaxLoss] Starting calculation for', legs.length, 'legs');
+  console.log('[calcMaxLoss] Legs:', legs.map(l => ({ type: l.optionType, position: l.position, strike: l.strikePrice, premium: l.premium, qty: l.quantity })));
+
   if (legs.length === 0) {
     return 0;
   }
 
   // Check for unlimited loss potential
-  if (hasUnlimitedLoss(legs)) {
+  const unlimited = hasUnlimitedLoss(legs);
+  console.log('[calcMaxLoss] hasUnlimitedLoss returned:', unlimited);
+
+  if (unlimited) {
     return null;
   }
 
   // Generate strategic price points to test
   const pricePoints = generateStrategicPricePoints(currentStockPrice, legs);
+  console.log('[calcMaxLoss] Testing', pricePoints.length, 'price points');
 
   // Calculate P/L at each price point and find minimum (most negative)
   const profits = pricePoints.map((price) => calcTotalPL(legs, price));
 
-  return Math.min(...profits);
+  const maxLoss = Math.min(...profits);
+  console.log('[calcMaxLoss] Max loss calculated:', maxLoss);
+
+  return maxLoss;
 }
 
 /**
@@ -151,13 +351,32 @@ export function hasUnlimitedProfit(legs: OptionLeg[]): boolean {
   const longCallQuantity = longCalls.reduce((sum, leg) => sum + leg.quantity, 0);
   const shortCallQuantity = shortCalls.reduce((sum, leg) => sum + leg.quantity, 0);
 
+  console.log('[hasUnlimitedProfit] Long calls:', longCallQuantity, 'Short calls:', shortCallQuantity);
+
   // If we have more long calls than short calls, profit is unlimited
-  // (assuming long calls have lower or equal strikes)
   if (longCallQuantity > shortCallQuantity) {
-    // Check if long calls are truly uncovered
-    return !areAllCallsCovered(legs);
+    // For each long call, check if it's covered by a higher-strike short call
+    // If any long call is NOT covered, we have unlimited profit potential
+    for (const longCall of longCalls) {
+      // Find short calls at higher strikes that could cap this long call's profit
+      const cappingShortCalls = shortCalls.filter(
+        (shortCall) => shortCall.strikePrice > longCall.strikePrice
+      );
+
+      // Sum up the capping quantity
+      const cappingQuantity = cappingShortCalls.reduce((sum, leg) => sum + leg.quantity, 0);
+
+      console.log(`[hasUnlimitedProfit] Long call @${longCall.strikePrice} qty ${longCall.quantity}, capped by ${cappingQuantity}`);
+
+      // If this long call has quantity that exceeds capping short calls, profit is unlimited
+      if (longCall.quantity > cappingQuantity) {
+        console.log('[hasUnlimitedProfit] UNLIMITED PROFIT DETECTED!');
+        return true;
+      }
+    }
   }
 
+  console.log('[hasUnlimitedProfit] Profit is LIMITED');
   return false;
 }
 
@@ -174,7 +393,10 @@ export function hasUnlimitedLoss(legs: OptionLeg[]): boolean {
     (leg) => leg.optionType === OptionType.CALL && leg.position === Position.SHORT
   );
 
+  console.log('[hasUnlimitedLoss] Short calls found:', shortCalls.length);
+
   if (shortCalls.length === 0) {
+    console.log('[hasUnlimitedLoss] No short calls - loss is LIMITED');
     return false;
   }
 
@@ -187,11 +409,16 @@ export function hasUnlimitedLoss(legs: OptionLeg[]): boolean {
   const shortCallQuantity = shortCalls.reduce((sum, leg) => sum + leg.quantity, 0);
   const longCallQuantity = longCalls.reduce((sum, leg) => sum + leg.quantity, 0);
 
+  console.log('[hasUnlimitedLoss] Short call quantity:', shortCallQuantity, 'Long call quantity:', longCallQuantity);
+
   // If we have more short calls than long calls, loss is unlimited
   if (shortCallQuantity > longCallQuantity) {
-    return !areAllCallsCovered(legs);
+    const result = !areAllCallsCovered(legs);
+    console.log('[hasUnlimitedLoss] More short than long, uncovered?', result);
+    return result;
   }
 
+  console.log('[hasUnlimitedLoss] Covered or balanced - loss is LIMITED');
   return false;
 }
 
@@ -244,7 +471,7 @@ export function generateStrategicPricePoints(
   const maxStrike = Math.max(...strikes);
 
   const points = new Set<number>([
-    0, // Stock goes to zero (for puts)
+    0.01, // Near zero (for puts, avoids validation error)
     minStrike * 0.5, // Well below min strike
     ...strikes, // All strike prices
     currentPrice, // Current price
@@ -255,8 +482,12 @@ export function generateStrategicPricePoints(
   // Add midpoints between consecutive strikes
   const sortedStrikes = Array.from(new Set(strikes)).sort((a, b) => a - b);
   for (let i = 0; i < sortedStrikes.length - 1; i++) {
-    const midpoint = (sortedStrikes[i] + sortedStrikes[i + 1]) / 2;
-    points.add(midpoint);
+    const current = sortedStrikes[i];
+    const next = sortedStrikes[i + 1];
+    if (current !== undefined && next !== undefined) {
+      const midpoint = (current + next) / 2;
+      points.add(midpoint);
+    }
   }
 
   // Convert to sorted array and filter out negative prices
@@ -278,7 +509,7 @@ export function generateStrategicPricePoints(
  */
 export function isDeltaNeutral(
   legs: OptionLeg[],
-  currentStockPrice: number,
+  _currentStockPrice: number,
   tolerance: number = 0.1
 ): boolean {
   // Simple heuristic: check if long and short positions are balanced
@@ -327,7 +558,7 @@ export function classifyStrategy(legs: OptionLeg[]): string {
     const call = callLegs[0];
     const put = putLegs[0];
 
-    if (call.position === put.position) {
+    if (call && put && call.position === put.position) {
       if (call.strikePrice === put.strikePrice) {
         return call.position === Position.LONG ? 'Long Straddle' : 'Short Straddle';
       } else {
@@ -340,6 +571,10 @@ export function classifyStrategy(legs: OptionLeg[]): string {
   if (legs.length === 2 && (callLegs.length === 2 || putLegs.length === 2)) {
     const leg1 = legs[0];
     const leg2 = legs[1];
+
+    if (!leg1 || !leg2) {
+      return 'Custom Strategy';
+    }
 
     if (leg1.optionType === leg2.optionType && leg1.position !== leg2.position) {
       const longLeg = leg1.position === Position.LONG ? leg1 : leg2;

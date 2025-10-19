@@ -3,24 +3,25 @@
  * Calculates P/L at expiration (intrinsic value only, no time value)
  */
 
-import { OptionType, Position, OptionLeg } from '../types';
+import { OptionType, Position, OptionLeg, ErrorCode } from '../types';
 import { CONTRACT_MULTIPLIER } from '../constants/defaults';
-import { CalculationError, ErrorCode } from '../types/errors';
+import { CalculationError } from '../types/errors';
+import { callPayoffLong, callPayoffShort, putPayoffLong, putPayoffShort, toContractPayoff } from './payoff-helpers';
 
 /**
  * Calculate profit/loss for a long call option
  *
- * Formula: P/L = (max(0, S - K) - premium) × 100 × quantity
+ * Formula: P/L = (max(0, S - K) × 100 - premium) × quantity
  *
  * @param stockPrice - Stock price at evaluation
  * @param strikePrice - Strike price of the option
- * @param premium - Premium paid per share
+ * @param premium - Premium paid per contract (total contract cost)
  * @param quantity - Number of contracts (default 1)
  * @returns Profit or loss in dollars
  *
  * @example
- * // Buy 1 call at $50 strike for $2, stock at $55
- * calcLongCall(55, 50, 2, 1); // returns 300
+ * // Buy 1 call at $50 strike for $200 premium, stock at $55
+ * calcLongCall(55, 50, 200, 1); // returns 300
  */
 export function calcLongCall(
   stockPrice: number,
@@ -30,24 +31,26 @@ export function calcLongCall(
 ): number {
   validateInputs(stockPrice, strikePrice, premium, quantity);
 
-  const intrinsicValue = Math.max(0, stockPrice - strikePrice);
-  return (intrinsicValue - premium) * CONTRACT_MULTIPLIER * quantity;
+  // Premium is per-contract, convert to per-share for helper
+  const premiumPerShare = premium / CONTRACT_MULTIPLIER;
+  const perSharePL = callPayoffLong(stockPrice, strikePrice, premiumPerShare);
+  return toContractPayoff(perSharePL, quantity, CONTRACT_MULTIPLIER);
 }
 
 /**
  * Calculate profit/loss for a long put option
  *
- * Formula: P/L = (max(0, K - S) - premium) × 100 × quantity
+ * Formula: P/L = (max(0, K - S) × 100 - premium) × quantity
  *
  * @param stockPrice - Stock price at evaluation
  * @param strikePrice - Strike price of the option
- * @param premium - Premium paid per share
+ * @param premium - Premium paid per contract (total contract cost)
  * @param quantity - Number of contracts (default 1)
  * @returns Profit or loss in dollars
  *
  * @example
- * // Buy 1 put at $50 strike for $2, stock at $45
- * calcLongPut(45, 50, 2, 1); // returns 300
+ * // Buy 1 put at $50 strike for $200 premium, stock at $45
+ * calcLongPut(45, 50, 200, 1); // returns 300
  */
 export function calcLongPut(
   stockPrice: number,
@@ -57,24 +60,26 @@ export function calcLongPut(
 ): number {
   validateInputs(stockPrice, strikePrice, premium, quantity);
 
-  const intrinsicValue = Math.max(0, strikePrice - stockPrice);
-  return (intrinsicValue - premium) * CONTRACT_MULTIPLIER * quantity;
+  // Premium is per-contract, convert to per-share for helper
+  const premiumPerShare = premium / CONTRACT_MULTIPLIER;
+  const perSharePL = putPayoffLong(stockPrice, strikePrice, premiumPerShare);
+  return toContractPayoff(perSharePL, quantity, CONTRACT_MULTIPLIER);
 }
 
 /**
  * Calculate profit/loss for a short call option
  *
- * Formula: P/L = (premium - max(0, S - K)) × 100 × quantity
+ * Formula: P/L = (premium - max(0, S - K) × 100) × quantity
  *
  * @param stockPrice - Stock price at evaluation
  * @param strikePrice - Strike price of the option
- * @param premium - Premium received per share
+ * @param premium - Premium received per contract (total contract credit)
  * @param quantity - Number of contracts (default 1)
  * @returns Profit or loss in dollars
  *
  * @example
- * // Sell 1 call at $50 strike for $2, stock at $55
- * calcShortCall(55, 50, 2, 1); // returns -300
+ * // Sell 1 call at $50 strike for $200 premium, stock at $55
+ * calcShortCall(55, 50, 200, 1); // returns -300
  */
 export function calcShortCall(
   stockPrice: number,
@@ -84,24 +89,26 @@ export function calcShortCall(
 ): number {
   validateInputs(stockPrice, strikePrice, premium, quantity);
 
-  const intrinsicValue = Math.max(0, stockPrice - strikePrice);
-  return (premium - intrinsicValue) * CONTRACT_MULTIPLIER * quantity;
+  // Premium is per-contract, convert to per-share for helper
+  const premiumPerShare = premium / CONTRACT_MULTIPLIER;
+  const perSharePL = callPayoffShort(stockPrice, strikePrice, premiumPerShare);
+  return toContractPayoff(perSharePL, quantity, CONTRACT_MULTIPLIER);
 }
 
 /**
  * Calculate profit/loss for a short put option
  *
- * Formula: P/L = (premium - max(0, K - S)) × 100 × quantity
+ * Formula: P/L = (premium - max(0, K - S) × 100) × quantity
  *
  * @param stockPrice - Stock price at evaluation
  * @param strikePrice - Strike price of the option
- * @param premium - Premium received per share
+ * @param premium - Premium received per contract (total contract credit)
  * @param quantity - Number of contracts (default 1)
  * @returns Profit or loss in dollars
  *
  * @example
- * // Sell 1 put at $50 strike for $2, stock at $45
- * calcShortPut(45, 50, 2, 1); // returns -300
+ * // Sell 1 put at $50 strike for $200 premium, stock at $45
+ * calcShortPut(45, 50, 200, 1); // returns -300
  */
 export function calcShortPut(
   stockPrice: number,
@@ -111,8 +118,10 @@ export function calcShortPut(
 ): number {
   validateInputs(stockPrice, strikePrice, premium, quantity);
 
-  const intrinsicValue = Math.max(0, strikePrice - stockPrice);
-  return (premium - intrinsicValue) * CONTRACT_MULTIPLIER * quantity;
+  // Premium is per-contract, convert to per-share for helper
+  const premiumPerShare = premium / CONTRACT_MULTIPLIER;
+  const perSharePL = putPayoffShort(stockPrice, strikePrice, premiumPerShare);
+  return toContractPayoff(perSharePL, quantity, CONTRACT_MULTIPLIER);
 }
 
 /**
@@ -219,16 +228,16 @@ export function calcSingleOptionBreakEven(
  * @param optionType - Call or Put
  * @param position - Long or Short
  * @param strikePrice - Strike price
- * @param premium - Premium per share
+ * @param premium - Premium per contract (total contract cost/credit)
  * @param quantity - Number of contracts
  * @returns Maximum profit (null if unlimited)
  *
  * @example
  * // Long call - unlimited profit potential
- * calcMaxProfit(OptionType.CALL, Position.LONG, 50, 2, 1); // returns null
+ * calcMaxProfit(OptionType.CALL, Position.LONG, 50, 200, 1); // returns null
  *
  * // Short call - limited to premium received
- * calcMaxProfit(OptionType.CALL, Position.SHORT, 50, 2, 1); // returns 200
+ * calcMaxProfit(OptionType.CALL, Position.SHORT, 50, 200, 1); // returns 200
  */
 export function calcMaxProfit(
   optionType: OptionType,
@@ -244,17 +253,17 @@ export function calcMaxProfit(
 
   // Short Call - max profit is premium received
   if (optionType === OptionType.CALL && position === Position.SHORT) {
-    return premium * CONTRACT_MULTIPLIER * quantity;
+    return premium * quantity;
   }
 
   // Long Put - max profit when stock goes to $0
   if (optionType === OptionType.PUT && position === Position.LONG) {
-    return (strikePrice - premium) * CONTRACT_MULTIPLIER * quantity;
+    return (strikePrice * CONTRACT_MULTIPLIER - premium) * quantity;
   }
 
   // Short Put - max profit is premium received
   if (optionType === OptionType.PUT && position === Position.SHORT) {
-    return premium * CONTRACT_MULTIPLIER * quantity;
+    return premium * quantity;
   }
 
   return null;
@@ -266,16 +275,16 @@ export function calcMaxProfit(
  * @param optionType - Call or Put
  * @param position - Long or Short
  * @param strikePrice - Strike price
- * @param premium - Premium per share
+ * @param premium - Premium per contract (total contract cost/credit)
  * @param quantity - Number of contracts
  * @returns Maximum loss (null if unlimited)
  *
  * @example
  * // Long call - max loss is premium paid
- * calcMaxLoss(OptionType.CALL, Position.LONG, 50, 2, 1); // returns -200
+ * calcMaxLoss(OptionType.CALL, Position.LONG, 50, 200, 1); // returns -200
  *
  * // Short call - unlimited loss potential
- * calcMaxLoss(OptionType.CALL, Position.SHORT, 50, 2, 1); // returns null
+ * calcMaxLoss(OptionType.CALL, Position.SHORT, 50, 200, 1); // returns null
  */
 export function calcMaxLoss(
   optionType: OptionType,
@@ -286,7 +295,7 @@ export function calcMaxLoss(
 ): number | null {
   // Long Call - max loss is premium paid
   if (optionType === OptionType.CALL && position === Position.LONG) {
-    return -premium * CONTRACT_MULTIPLIER * quantity;
+    return -premium * quantity;
   }
 
   // Short Call - unlimited loss potential
@@ -296,12 +305,12 @@ export function calcMaxLoss(
 
   // Long Put - max loss is premium paid
   if (optionType === OptionType.PUT && position === Position.LONG) {
-    return -premium * CONTRACT_MULTIPLIER * quantity;
+    return -premium * quantity;
   }
 
   // Short Put - max loss when stock goes to $0
   if (optionType === OptionType.PUT && position === Position.SHORT) {
-    return -(strikePrice - premium) * CONTRACT_MULTIPLIER * quantity;
+    return -(strikePrice * CONTRACT_MULTIPLIER - premium) * quantity;
   }
 
   return null;

@@ -7,6 +7,39 @@ export default {
   ],
   theme: {
     extend: {
+      gridColumn: {
+        'span-1': 'span 1 / span 1',
+        'span-2': 'span 2 / span 2',
+        'span-3': 'span 3 / span 3',
+        'span-4': 'span 4 / span 4',
+        'span-5': 'span 5 / span 5',
+        'span-6': 'span 6 / span 6',
+        'span-7': 'span 7 / span 7',
+        'span-8': 'span 8 / span 8',
+        'span-9': 'span 9 / span 9',
+        'span-10': 'span 10 / span 10',
+        'span-11': 'span 11 / span 11',
+        'span-12': 'span 12 / span 12',
+      },
+      gridRow: {
+        'span-20': 'span 20 / span 20',
+        'span-25': 'span 25 / span 25',
+        'span-30': 'span 30 / span 30',
+        'span-35': 'span 35 / span 35',
+        'span-40': 'span 40 / span 40',
+        'span-45': 'span 45 / span 45',
+        'span-50': 'span 50 / span 50',
+        'span-55': 'span 55 / span 55',
+        'span-60': 'span 60 / span 60',
+        'span-65': 'span 65 / span 65',
+        'span-70': 'span 70 / span 70',
+        'span-75': 'span 75 / span 75',
+        'span-80': 'span 80 / span 80',
+        'span-85': 'span 85 / span 85',
+        'span-90': 'span 90 / span 90',
+        'span-95': 'span 95 / span 95',
+        'span-100': 'span 100 / span 100',
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -60,6 +93,7 @@ export default {
         'float': 'float 6s ease-in-out infinite',
         'shimmer': 'shimmer 3s linear infinite',
         'glow-pulse': 'glowPulse 2s ease-in-out infinite',
+        'border-beam': 'border-beam calc(var(--duration)*1s) infinite linear',
       },
       keyframes: {
         fadeIn: {
@@ -81,7 +115,12 @@ export default {
         glowPulse: {
           '0%, 100%': { boxShadow: '0 0 20px rgba(99, 102, 241, 0.3)' },
           '50%': { boxShadow: '0 0 40px rgba(99, 102, 241, 0.6)' }
-        }
+        },
+        'border-beam': {
+          '100%': {
+            'offset-distance': '100%',
+          },
+        },
       },
       backgroundImage: {
         'grid-pattern': 'linear-gradient(to right, rgba(99, 102, 241, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(99, 102, 241, 0.05) 1px, transparent 1px)',

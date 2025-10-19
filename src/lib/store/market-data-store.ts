@@ -81,6 +81,8 @@ export const useMarketDataStore = create<MarketDataStore>((set, get) => ({
    * Fetch stock quote for a symbol
    */
   fetchStockQuote: async (symbol) => {
+    console.log('[STORE] fetchStockQuote called with symbol:', symbol);
+
     set((state) => ({
       stockQuote: {
         ...state.stockQuote,
@@ -92,12 +94,41 @@ export const useMarketDataStore = create<MarketDataStore>((set, get) => ({
     }));
 
     try {
+      console.log('[STORE] Calling marketDataService.getStockPrice...');
       const response = await marketDataService.getStockPrice({ symbol });
+
+      console.log('[STORE] API Response received:');
+      console.log('  - Full response:', response);
+      console.log('  - response.data:', response.data);
+      console.log('  - response.data TYPE:', typeof response.data);
+      console.log('  - response.data KEYS:', response.data ? Object.keys(response.data) : 'null');
+      console.log('  - response.status:', response.status);
+      console.log('  - response.timestamp:', response.timestamp);
+
+      if (response.data && typeof response.data === 'object') {
+        console.log('  - response.data.price:', (response.data as any).price);
+        console.log('  - response.data.symbol:', (response.data as any).symbol);
+        console.log('  - response.data.data:', (response.data as any).data);
+
+        // Check if it's double-nested
+        if ((response.data as any).data) {
+          console.log('  - DOUBLE NESTED! response.data.data.price:', (response.data as any).data.price);
+          console.log('  - DOUBLE NESTED! response.data.data.symbol:', (response.data as any).data.symbol);
+        }
+      }
+
+      // Handle double-nested response structure from backend
+      // Backend returns: { data: { data: { price, symbol, ... } } }
+      // We need to extract the inner data object
+      const actualData = (response.data as any).data || response.data;
+
+      console.log('[STORE] Extracted actual data:', actualData);
+      console.log('[STORE] Actual data has price?', actualData?.price);
 
       set({
         stockQuote: {
           status: 'success',
-          data: response.data,
+          data: actualData,  // Use the inner data object
           error: null,
           timestamp: response.timestamp,
           isLoading: false,
@@ -105,7 +136,14 @@ export const useMarketDataStore = create<MarketDataStore>((set, get) => ({
           isError: false,
         },
       });
+
+      console.log('[STORE] Stock quote state updated successfully');
     } catch (error) {
+      console.error('[STORE] Error in fetchStockQuote:');
+      console.error('  - Error:', error);
+      console.error('  - Error type:', typeof error);
+      console.error('  - Error message:', error instanceof Error ? error.message : 'Unknown');
+
       set({
         stockQuote: {
           status: 'error',
@@ -117,6 +155,9 @@ export const useMarketDataStore = create<MarketDataStore>((set, get) => ({
           isError: true,
         },
       });
+
+      console.log('[STORE] Stock quote state updated with error');
+      throw error; // Re-throw to let handleGetPrice catch it
     }
   },
 

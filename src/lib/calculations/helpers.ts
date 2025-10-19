@@ -98,14 +98,15 @@ export function calculateDaysToExpiry(expiryDate: Date): number {
 }
 
 /**
- * Calculate d1 parameter for Black-Scholes formula
- * d1 = [ln(S/K) + (r + σ²/2) × T] / (σ × √T)
+ * Calculate d1 parameter for Black-Scholes formula (with dividend yield support)
+ * d1 = [ln(S/K) + (r - q + σ²/2) × T] / (σ × √T)
  *
  * @param stockPrice - Current stock price (S)
  * @param strikePrice - Strike price (K)
  * @param timeToExpiry - Time to expiration in years (T)
  * @param riskFreeRate - Risk-free rate (r)
  * @param volatility - Volatility (σ)
+ * @param dividendYield - Dividend yield (q, default 0)
  * @returns d1 value
  *
  * @throws {Error} If denominator is zero (volatility * sqrt(T) = 0)
@@ -115,11 +116,12 @@ export function calculateD1(
   strikePrice: number,
   timeToExpiry: number,
   riskFreeRate: number,
-  volatility: number
+  volatility: number,
+  dividendYield: number = 0
 ): number {
   const numerator =
     Math.log(stockPrice / strikePrice) +
-    (riskFreeRate + 0.5 * volatility * volatility) * timeToExpiry;
+    (riskFreeRate - dividendYield + 0.5 * volatility * volatility) * timeToExpiry;
 
   const denominator = volatility * Math.sqrt(timeToExpiry);
 

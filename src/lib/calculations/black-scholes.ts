@@ -3,8 +3,8 @@
  * Calculates theoretical option prices using the Black-Scholes formula
  */
 
-import { OptionType, BlackScholesParams, BlackScholesResult } from '../types';
-import { CalculationError, ErrorCode, checkDivisionByZero } from '../types/errors';
+import { OptionType, BlackScholesParams, BlackScholesResult, ErrorCode } from '../types';
+import { CalculationError } from '../types/errors';
 import { normalCDF, calculateD1, calculateD2 } from './helpers';
 import { calcIntrinsicValue } from './basic-pl';
 
@@ -37,7 +37,7 @@ import { calcIntrinsicValue } from './basic-pl';
  * console.log(result.optionPrice); // ~7.97
  */
 export function blackScholes(params: BlackScholesParams): BlackScholesResult {
-  const { optionType, stockPrice, strikePrice, timeToExpiry, riskFreeRate, volatility } = params;
+  const { optionType, stockPrice, strikePrice, timeToExpiry, riskFreeRate, volatility, dividendYield = 0 } = params;
 
   // Validate inputs
   validateBlackScholesInputs(params);
@@ -56,28 +56,29 @@ export function blackScholes(params: BlackScholesParams): BlackScholesResult {
   if (volatility === 0) {
     const intrinsicValue = calcIntrinsicValue(optionType, stockPrice, strikePrice);
     const presentValueStrike = strikePrice * Math.exp(-riskFreeRate * timeToExpiry);
+    const adjustedStockPrice = stockPrice * Math.exp(-dividendYield * timeToExpiry);
 
     if (optionType === OptionType.CALL) {
       return {
-        optionPrice: Math.max(0, stockPrice - presentValueStrike),
+        optionPrice: Math.max(0, adjustedStockPrice - presentValueStrike),
         d1: stockPrice > strikePrice ? Infinity : -Infinity,
         d2: stockPrice > strikePrice ? Infinity : -Infinity,
       };
     } else {
       return {
-        optionPrice: Math.max(0, presentValueStrike - stockPrice),
+        optionPrice: Math.max(0, presentValueStrike - adjustedStockPrice),
         d1: stockPrice < strikePrice ? -Infinity : Infinity,
         d2: stockPrice < strikePrice ? -Infinity : Infinity,
       };
     }
   }
 
-  // Calculate d1 and d2
+  // Calculate d1 and d2 with dividend yield
   let d1: number;
   let d2: number;
 
   try {
-    d1 = calculateD1(stockPrice, strikePrice, timeToExpiry, riskFreeRate, volatility);
+    d1 = calculateD1(stockPrice, strikePrice, timeToExpiry, riskFreeRate, volatility, dividendYield);
     d2 = calculateD2(d1, volatility, timeToExpiry);
   } catch (error) {
     throw new CalculationError(
@@ -87,19 +88,22 @@ export function blackScholes(params: BlackScholesParams): BlackScholesResult {
     );
   }
 
-  // Calculate option price based on type
+  // Calculate option price based on type (with dividend yield)
   let optionPrice: number;
 
   try {
+    // Adjust stock price for dividend yield: S * e^(-q*T)
+    const adjustedStockPrice = stockPrice * Math.exp(-dividendYield * timeToExpiry);
+
     if (optionType === OptionType.CALL) {
-      // Call option: C = S₀N(d₁) - Ke^(-rT)N(d₂)
-      const term1 = stockPrice * normalCDF(d1);
+      // Call option: C = S*e^(-qT)*N(d₁) - K*e^(-rT)*N(d₂)
+      const term1 = adjustedStockPrice * normalCDF(d1);
       const term2 = strikePrice * Math.exp(-riskFreeRate * timeToExpiry) * normalCDF(d2);
       optionPrice = term1 - term2;
     } else {
-      // Put option: P = Ke^(-rT)N(-d₂) - S₀N(-d₁)
+      // Put option: P = K*e^(-rT)*N(-d₂) - S*e^(-qT)*N(-d₁)
       const term1 = strikePrice * Math.exp(-riskFreeRate * timeToExpiry) * normalCDF(-d2);
-      const term2 = stockPrice * normalCDF(-d1);
+      const term2 = adjustedStockPrice * normalCDF(-d1);
       optionPrice = term1 - term2;
     }
   } catch (error) {
@@ -129,6 +133,7 @@ export function blackScholes(params: BlackScholesParams): BlackScholesResult {
  * @param timeToExpiry - Time to expiration in years
  * @param riskFreeRate - Risk-free rate (decimal)
  * @param volatility - Volatility (decimal)
+ * @param dividendYield - Dividend yield (decimal, default 0)
  * @returns Call option price
  */
 export function blackScholesCall(
@@ -136,7 +141,8 @@ export function blackScholesCall(
   strikePrice: number,
   timeToExpiry: number,
   riskFreeRate: number,
-  volatility: number
+  volatility: number,
+  dividendYield: number = 0
 ): number {
   const result = blackScholes({
     optionType: OptionType.CALL,
@@ -145,6 +151,7 @@ export function blackScholesCall(
     timeToExpiry,
     riskFreeRate,
     volatility,
+    dividendYield,
   });
   return result.optionPrice;
 }
@@ -158,6 +165,7 @@ export function blackScholesCall(
  * @param timeToExpiry - Time to expiration in years
  * @param riskFreeRate - Risk-free rate (decimal)
  * @param volatility - Volatility (decimal)
+ * @param dividendYield - Dividend yield (decimal, default 0)
  * @returns Put option price
  */
 export function blackScholesPut(
@@ -165,7 +173,8 @@ export function blackScholesPut(
   strikePrice: number,
   timeToExpiry: number,
   riskFreeRate: number,
-  volatility: number
+  volatility: number,
+  dividendYield: number = 0
 ): number {
   const result = blackScholes({
     optionType: OptionType.PUT,
@@ -174,6 +183,7 @@ export function blackScholesPut(
     timeToExpiry,
     riskFreeRate,
     volatility,
+    dividendYield,
   });
   return result.optionPrice;
 }

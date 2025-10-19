@@ -16,9 +16,9 @@ export function AdSidebar() {
         <div className="text-sm">AD SPACE</div>
         <div className="text-xs">300×250</div>
       </div>
-      <div className="h-[600px] glass-card border border-white/10 rounded-2xl flex flex-col items-center justify-center text-gray-500 font-medium">
+      <div className="h-64 glass-card border border-white/10 rounded-2xl flex flex-col items-center justify-center text-gray-500 font-medium">
         <div className="text-sm">AD SPACE</div>
-        <div className="text-xs">300×600</div>
+        <div className="text-xs">300×250</div>
       </div>
     </aside>
   )

@@ -3,12 +3,12 @@
  * Generates data points for profit/loss visualization
  */
 
-import { OptionLeg, ChartDataPoint, ChartConfig } from '../types';
+import { OptionLeg, ChartDataPoint, ChartConfig, ErrorCode } from '../types';
 import { calcTotalPL } from './multi-leg';
 import { findBreakEvens } from './break-even';
 import { DEFAULT_PRICE_RANGE, DEFAULT_CHART_POINTS } from '../constants/defaults';
 import { roundTo } from './helpers';
-import { CalculationError, ErrorCode } from '../types/errors';
+import { CalculationError } from '../types/errors';
 
 /**
  * Generate chart data points for P/L visualization

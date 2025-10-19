@@ -3,10 +3,10 @@
  * Calculate Delta, Gamma, Theta, Vega, and Rho
  */
 
-import { OptionType, Position, OptionLeg, GreeksResult, LegGreeks } from '../types';
+import { OptionType, Position, OptionLeg, GreeksResult, LegGreeks, ErrorCode } from '../types';
 import { normalCDF, normalPDF, calculateD1, calculateD2, calculateTimeToExpiry } from './helpers';
 import { DAYS_PER_YEAR } from '../constants/defaults';
-import { CalculationError, ErrorCode } from '../types/errors';
+import { CalculationError } from '../types/errors';
 
 /**
  * Calculate Delta - sensitivity to stock price changes

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -88,62 +89,61 @@ export function OptionLegForm() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="strike">Strike Price</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  $
-                </span>
-                <Input
-                  id="strike"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.strikePrice || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, strikePrice: Number(e.target.value) })
-                  }
-                  className="pl-7"
-                  placeholder="0.00"
-                  required
-                />
-              </div>
+              <NumberInput
+                id="strike"
+                placeholder="0.00"
+                value={formData.strikePrice.toString()}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, strikePrice: value })
+                }
+                startContent={<span className="text-muted-foreground">$</span>}
+                step={0.01}
+                minValue={0}
+                isRequired
+                aria-label="Strike price"
+                formatOptions={{
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                }}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="premium">Premium (per share)</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  $
-                </span>
-                <Input
-                  id="premium"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.premium || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, premium: Number(e.target.value) })
-                  }
-                  className="pl-7"
-                  placeholder="0.00"
-                  required
-                />
-              </div>
+              <NumberInput
+                id="premium"
+                placeholder="0.00"
+                value={formData.premium.toString()}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, premium: value })
+                }
+                startContent={<span className="text-muted-foreground">$</span>}
+                step={0.01}
+                minValue={0}
+                isRequired
+                aria-label="Premium per share"
+                formatOptions={{
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                }}
+              />
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="quantity">Quantity (contracts)</Label>
-              <Input
+              <NumberInput
                 id="quantity"
-                type="number"
-                min="1"
-                value={formData.quantity}
-                onChange={(e) =>
-                  setFormData({ ...formData, quantity: Number(e.target.value) })
-                }
                 placeholder="1"
-                required
+                value={formData.quantity.toString()}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, quantity: value })
+                }
+                minValue={1}
+                step={1}
+                isRequired
+                aria-label="Quantity of contracts"
               />
             </div>
 

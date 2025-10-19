@@ -3,12 +3,13 @@
  * Finds stock prices where strategy P/L equals zero
  */
 
-import { OptionLeg } from '../types';
+import { OptionLeg, ErrorCode, OptionType, Position } from '../types';
 import { calcTotalPL, generateStrategicPricePoints } from './multi-leg';
 import { calcSingleOptionBreakEven } from './basic-pl';
-import { BREAK_EVEN_PRECISION, MAX_ITERATIONS } from '../constants/defaults';
-import { CalculationError, ErrorCode } from '../types/errors';
+import { BREAK_EVEN_PRECISION, MAX_ITERATIONS, CONTRACT_MULTIPLIER } from '../constants/defaults';
+import { CalculationError } from '../types/errors';
 import { roundTo } from './helpers';
+import { detectStrategy, StrategyType } from './strategy-detector';
 
 /**
  * Find all break-even points for a multi-leg strategy
@@ -36,14 +37,21 @@ export function findBreakEvens(
   }
 
   // For single leg strategies, use analytical formula
-  if (legs.length === 1) {
+  if (legs.length === 1 && legs[0]) {
     const leg = legs[0];
+    const premiumPerShare = leg.premium / CONTRACT_MULTIPLIER;
     const breakEven = calcSingleOptionBreakEven(
       leg.optionType,
       leg.strikePrice,
-      leg.premium
+      premiumPerShare
     );
     return [roundTo(breakEven, 2)];
+  }
+
+  // Try analytical formulas for known strategies
+  const analyticalBreakEvens = tryAnalyticalBreakEvens(legs);
+  if (analyticalBreakEvens !== null) {
+    return analyticalBreakEvens.map((be) => roundTo(be, 2));
   }
 
   // Define search range
@@ -52,6 +60,106 @@ export function findBreakEvens(
 
   // Find break-even points using scan and bisection
   return findBreakEvensByScan(legs, minPrice, maxPrice, precision);
+}
+
+/**
+ * Try to calculate break-evens analytically for known strategies
+ * Returns null if strategy doesn't have analytical solution
+ */
+function tryAnalyticalBreakEvens(legs: OptionLeg[]): number[] | null {
+  const detection = detectStrategy(legs);
+
+  // Only use analytical formulas if we're confident
+  if (detection.confidence < 0.8) {
+    return null;
+  }
+
+  try {
+    switch (detection.type) {
+      case StrategyType.BULL_CALL_SPREAD:
+      case StrategyType.BEAR_CALL_SPREAD: {
+        // Vertical call spread: B/E = lower strike + net debit
+        const longLeg = legs.find((l) => l.position === Position.LONG)!;
+        const shortLeg = legs.find((l) => l.position === Position.SHORT)!;
+        const netDebit = (longLeg.premium - shortLeg.premium) / CONTRACT_MULTIPLIER;
+        const lowerStrike = Math.min(longLeg.strikePrice, shortLeg.strikePrice);
+        return [lowerStrike + netDebit];
+      }
+
+      case StrategyType.BULL_PUT_SPREAD:
+      case StrategyType.BEAR_PUT_SPREAD: {
+        // Vertical put spread: B/E = higher strike - net debit
+        const longLeg = legs.find((l) => l.position === Position.LONG)!;
+        const shortLeg = legs.find((l) => l.position === Position.SHORT)!;
+        const netDebit = (longLeg.premium - shortLeg.premium) / CONTRACT_MULTIPLIER;
+        const higherStrike = Math.max(longLeg.strikePrice, shortLeg.strikePrice);
+        return [higherStrike - Math.abs(netDebit)];
+      }
+
+      case StrategyType.LONG_STRADDLE: {
+        // Long straddle: two break-evens at K ± total premium
+        const call = legs.find((l) => l.optionType === OptionType.CALL)!;
+        const put = legs.find((l) => l.optionType === OptionType.PUT)!;
+        const totalPremium = (call.premium + put.premium) / CONTRACT_MULTIPLIER;
+        const K = call.strikePrice;
+        return [K - totalPremium, K + totalPremium].sort((a, b) => a - b);
+      }
+
+      case StrategyType.LONG_STRANGLE: {
+        // Long strangle: two break-evens
+        const call = legs.find((l) => l.optionType === OptionType.CALL)!;
+        const put = legs.find((l) => l.optionType === OptionType.PUT)!;
+        const totalPremium = (call.premium + put.premium) / CONTRACT_MULTIPLIER;
+        return [put.strikePrice - totalPremium, call.strikePrice + totalPremium].sort((a, b) => a - b);
+      }
+
+      case StrategyType.SHORT_STRADDLE: {
+        // Short straddle: two break-evens at K ± total premium
+        const call = legs.find((l) => l.optionType === OptionType.CALL)!;
+        const put = legs.find((l) => l.optionType === OptionType.PUT)!;
+        const totalPremium = (call.premium + put.premium) / CONTRACT_MULTIPLIER;
+        const K = call.strikePrice;
+        return [K - totalPremium, K + totalPremium].sort((a, b) => a - b);
+      }
+
+      case StrategyType.SHORT_STRANGLE: {
+        // Short strangle: two break-evens
+        const call = legs.find((l) => l.optionType === OptionType.CALL)!;
+        const put = legs.find((l) => l.optionType === OptionType.PUT)!;
+        const totalPremium = (call.premium + put.premium) / CONTRACT_MULTIPLIER;
+        return [put.strikePrice - totalPremium, call.strikePrice + totalPremium].sort((a, b) => a - b);
+      }
+
+      case StrategyType.IRON_CONDOR: {
+        // Iron condor: two break-evens
+        const puts = legs.filter((l) => l.optionType === OptionType.PUT);
+        const calls = legs.filter((l) => l.optionType === OptionType.CALL);
+        const shortPut = puts.find((l) => l.position === Position.SHORT)!;
+        const shortCall = calls.find((l) => l.position === Position.SHORT)!;
+
+        const netCredit = legs.reduce((sum, leg) => {
+          return sum + (leg.position === Position.SHORT ? leg.premium : -leg.premium);
+        }, 0) / CONTRACT_MULTIPLIER;
+
+        return [
+          shortPut.strikePrice - netCredit,
+          shortCall.strikePrice + netCredit
+        ].sort((a, b) => a - b);
+      }
+
+      case StrategyType.BUTTERFLY: {
+        // Butterfly: typically one break-even on each side of center strike
+        // For simplicity, use numerical method (complex analytical formula)
+        return null;
+      }
+
+      default:
+        return null;
+    }
+  } catch (error) {
+    console.warn('Analytical break-even calculation failed:', error);
+    return null;
+  }
 }
 
 /**
@@ -240,9 +348,9 @@ function isDuplicate(
  * @returns Break-even price
  */
 export function newtonMethod(
-  legs: OptionLeg[],
-  initialGuess: number,
-  precision: number = BREAK_EVEN_PRECISION
+  _legs: OptionLeg[],
+  _initialGuess: number,
+  _precision: number = BREAK_EVEN_PRECISION
 ): number {
   // TODO: Implement Newton's method using numerical derivative
   // This would be more efficient but requires calculating delta

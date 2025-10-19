@@ -156,10 +156,35 @@ class YFinanceService:
 
             # Convert to list of dicts
             def process_options(df, option_type: str) -> List[Dict]:
+                import math
+
+                def safe_float(value, default=0.0):
+                    """Safely convert value to float, replacing NaN with default"""
+                    try:
+                        if value is None:
+                            return default
+                        f = float(value)
+                        return default if math.isnan(f) or math.isinf(f) else f
+                    except (ValueError, TypeError):
+                        return default
+
+                def safe_int(value, default=0):
+                    """Safely convert value to int, replacing NaN with default"""
+                    try:
+                        if value is None:
+                            return default
+                        if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+                            return default
+                        return int(value)
+                    except (ValueError, TypeError):
+                        return default
+
                 options = []
                 for _, row in df.iterrows():
-                    strike = float(row['strike'])
-                    last_price = float(row['lastPrice'])
+                    strike = safe_float(row['strike'])
+                    last_price = safe_float(row.get('lastPrice', 0))
+                    bid = safe_float(row.get('bid', 0))
+                    ask = safe_float(row.get('ask', 0))
 
                     # Calculate intrinsic and extrinsic value
                     if option_type == 'call':
@@ -170,24 +195,30 @@ class YFinanceService:
                     extrinsic = max(0, last_price - intrinsic)
                     in_the_money = intrinsic > 0
 
+                    # Calculate mid/mark price
+                    if bid > 0 and ask > 0:
+                        mark = (bid + ask) / 2
+                    else:
+                        mark = last_price
+
                     options.append({
                         "symbol": row.get('contractSymbol', ''),
                         "underlying": symbol.upper(),
                         "strikePrice": strike,
                         "expiryDate": expiry_date,
                         "optionType": option_type,
-                        "bid": float(row.get('bid', 0)),
-                        "ask": float(row.get('ask', 0)),
+                        "bid": bid,
+                        "ask": ask,
                         "lastPrice": last_price,
-                        "mark": float((row.get('bid', 0) + row.get('ask', 0)) / 2),
-                        "volume": int(row.get('volume', 0)),
-                        "openInterest": int(row.get('openInterest', 0)),
+                        "mark": mark,
+                        "volume": safe_int(row.get('volume', 0)),
+                        "openInterest": safe_int(row.get('openInterest', 0)),
                         "delta": None,  # yfinance doesn't provide greeks
                         "gamma": None,
                         "theta": None,
                         "vega": None,
                         "rho": None,
-                        "impliedVolatility": float(row.get('impliedVolatility', 0)),
+                        "impliedVolatility": safe_float(row.get('impliedVolatility', 0)),
                         "inTheMoney": in_the_money,
                         "intrinsicValue": intrinsic,
                         "extrinsicValue": extrinsic,

@@ -2,23 +2,39 @@ import { useState, useEffect } from 'react'
 import { Calculator, HelpCircle, RefreshCw, TrendingUp, TrendingDown, Table2 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import { Label } from '../ui/label'
 import { LegConfig } from '../../lib/constants/strategy-configs'
 import { useMarketDataStore } from '../../lib/store/market-data-store'
-import { OptionsChainModal } from './OptionsChainModal'
+import { useCalculatorStore } from '../../lib/store/calculator-store'
+import { UnifiedOptionsChain } from './UnifiedOptionsChain'
+import { StockPositionInput } from './StockPositionInput'
+import { DashboardCharts } from './DashboardCharts'
+import { OptionType, Position, StockLeg } from '../../lib/types'
 
 interface StrategyFormProps {
   legs: LegConfig[]
-  onCalculate?: () => void
 }
 
-export function StrategyForm({ legs, onCalculate }: StrategyFormProps) {
+export function StrategyForm({ legs }: StrategyFormProps) {
   const [symbol, setSymbol] = useState('')
   const [currentPrice, setCurrentPrice] = useState('')
   const [selectedExpiry, setSelectedExpiry] = useState<string>('')
   const [selectedOptions, setSelectedOptions] = useState<Record<number, string>>({})
   const [optionPremiums, setOptionPremiums] = useState<Record<number, string>>({})
   const [showOptionsModal, setShowOptionsModal] = useState<number | null>(null)
+  const [legPositions, setLegPositions] = useState<Record<number, 'buy' | 'write'>>({})
+  const [legContracts, setLegContracts] = useState<Record<number, string>>({})
+  const [legStrikes, setLegStrikes] = useState<Record<number, number>>({})
+  const [priceRangeMin, setPriceRangeMin] = useState('')
+  const [priceRangeMax, setPriceRangeMax] = useState('')
+  const [isManualPriceRange, setIsManualPriceRange] = useState(false)
+  const [stockPosition, setStockPosition] = useState<StockLeg | null>(null)
+
+  // Debug: Log currentPrice whenever it changes
+  useEffect(() => {
+    console.log('[RENDER] currentPrice value is now:', currentPrice, 'type:', typeof currentPrice)
+  }, [currentPrice])
 
   const {
     stockQuote,
@@ -30,21 +46,46 @@ export function StrategyForm({ legs, onCalculate }: StrategyFormProps) {
     setSelectedExpiryDate
   } = useMarketDataStore()
 
+  const { setInputs, calculate, results, inputs, isCalculating } = useCalculatorStore()
+
   const handleGetPrice = async () => {
     if (!symbol || symbol.trim() === '') {
       alert('Please enter a stock symbol')
       return
     }
 
-    console.log('Fetching price for:', symbol)
+    console.log('=== FETCHING PRICE ===')
+    console.log('Symbol:', symbol)
+    console.log('API Base URL:', '/api')
+    console.log('Full URL will be: /api/stocks/' + symbol.toUpperCase() + '/quote')
+
     try {
       await Promise.all([
         fetchStockQuote(symbol.toUpperCase()),
         fetchExpiryDates(symbol.toUpperCase())
       ])
-      console.log('Fetch complete, stockQuote:', stockQuote)
+      console.log('=== FETCH COMPLETE ===')
+      console.log('stockQuote object:', stockQuote)
+      console.log('stockQuote.data:', stockQuote.data)
+      console.log('stockQuote.isError:', stockQuote.isError)
+      console.log('stockQuote.error:', stockQuote.error)
     } catch (error) {
-      console.error('Error fetching price:', error)
+      console.error('=== FETCH ERROR ===')
+      console.error('Error object:', error)
+      console.error('Error message:', error instanceof Error ? error.message : 'Unknown error')
+
+      // Show user-friendly error
+      if (error instanceof Error) {
+        if (error.message.includes('404') || error.message.includes('HTTP')) {
+          alert(`Could not find stock data for ${symbol}. Please check the symbol and try again.`)
+        } else if (error.message.includes('timeout')) {
+          alert('Request timed out. Please check your connection and try again.')
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          alert('Network error. Please make sure the backend API server is running.')
+        } else {
+          alert(`Error fetching price: ${error.message}`)
+        }
+      }
     }
   }
 
@@ -96,37 +137,142 @@ export function StrategyForm({ legs, onCalculate }: StrategyFormProps) {
 
       if (selectedOption) {
         const premium = selectedOption.mark || selectedOption.lastPrice || 0
+        // API returns per-contract pricing (already multiplied by 100)
         setOptionPremiums(prev => ({ ...prev, [legIndex]: premium.toFixed(2) }))
       }
     }
   }
 
-  const handleModalOptionSelect = (legIndex: number, optionSymbol: string, premium: number, strike: number) => {
+  const handleModalOptionSelect = (legIndex: number, optionSymbol: string, premium: number, strike: number, expiryDate: string, optionType: 'call' | 'put') => {
     setSelectedOptions(prev => ({ ...prev, [legIndex]: optionSymbol }))
+    // API returns per-contract pricing (already multiplied by 100)
     setOptionPremiums(prev => ({ ...prev, [legIndex]: premium.toFixed(2) }))
+    setLegStrikes(prev => ({ ...prev, [legIndex]: strike }))
+    setSelectedExpiry(expiryDate)
     setShowOptionsModal(null)
   }
 
+  const handleCalculate = () => {
+    // Validate inputs
+    if (!currentPrice || parseFloat(currentPrice) <= 0) {
+      alert('Please enter a valid current stock price')
+      return
+    }
+
+    if (!selectedExpiry) {
+      alert('Please select an expiry date by choosing an option')
+      return
+    }
+
+    // Build option legs from form data
+    const optionLegs = legs.map((legConfig, index) => {
+      const premium = parseFloat(optionPremiums[index] || '0')
+      const contracts = parseFloat(legContracts[index] || '1')
+      const position = legPositions[index] || legConfig.position
+      const strike = legStrikes[index]
+
+      if (!strike || strike <= 0) {
+        throw new Error(`Please select a valid option for ${legConfig.label}`)
+      }
+
+      if (premium <= 0) {
+        throw new Error(`Please enter a valid premium for ${legConfig.label}`)
+      }
+
+      return {
+        id: `leg-${index}`,
+        optionType: legConfig.type === 'call' ? OptionType.CALL : OptionType.PUT,
+        position: position === 'buy' ? Position.LONG : Position.SHORT,
+        strikePrice: strike,
+        premium: premium,
+        quantity: contracts,
+        expiryDate: new Date(selectedExpiry)
+      }
+    })
+
+    try {
+      // Update calculator store with inputs
+      setInputs({
+        currentStockPrice: parseFloat(currentPrice),
+        legs: optionLegs,
+        stockPosition: stockPosition || undefined,
+        volatility: 0.30, // Default for now
+        riskFreeRate: 0.05, // Default for now
+        priceRange: priceRangeMin && priceRangeMax
+          ? (parseFloat(priceRangeMax) - parseFloat(priceRangeMin)) / parseFloat(currentPrice)
+          : 0.5,
+        chartPoints: 100
+      })
+
+      // Trigger calculation
+      calculate()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to calculate')
+    }
+  }
+
+  // Initialize default values for legs
+  useEffect(() => {
+    const initialPositions: Record<number, 'buy' | 'write'> = {}
+    const initialContracts: Record<number, string> = {}
+
+    legs.forEach((leg, index) => {
+      initialPositions[index] = leg.position
+      initialContracts[index] = '1'
+    })
+
+    setLegPositions(initialPositions)
+    setLegContracts(initialContracts)
+  }, [legs])
+
   // Auto-update price when stock data is fetched
   useEffect(() => {
-    console.log('useEffect triggered, stockQuote.data:', stockQuote.data)
+    console.log('[USEEFFECT] Triggered, stockQuote.data:', stockQuote.data)
+    console.log('[USEEFFECT] stockQuote.isSuccess:', stockQuote.isSuccess)
+    console.log('[USEEFFECT] stockQuote.isLoading:', stockQuote.isLoading)
 
-    // The API response is nested: stockQuote.data.data contains the actual stock data
-    const actualData = stockQuote.data as any
-    console.log('actualData?.data:', actualData?.data)
-    console.log('actualData?.data?.price:', actualData?.data?.price)
+    // Only update if we have successful data
+    if (stockQuote.isSuccess && stockQuote.data && typeof stockQuote.data === 'object' && 'price' in stockQuote.data) {
+      const priceValue = stockQuote.data.price
+      console.log('[USEEFFECT] Found price:', priceValue)
 
-    if (actualData?.data && actualData.data.price != null) {
-      const priceStr = Number(actualData.data.price).toFixed(2)
-      console.log('Setting price to:', priceStr)
-      setCurrentPrice(priceStr)
+      if (typeof priceValue === 'number' && !isNaN(priceValue) && priceValue > 0) {
+        const priceStr = priceValue.toFixed(2)
+        console.log('[USEEFFECT] Setting price to:', priceStr)
+        setCurrentPrice(priceStr)
+
+        // Verify the state was updated
+        setTimeout(() => {
+          console.log('[USEEFFECT] After setState - currentPrice should be:', priceStr)
+        }, 100)
+      } else {
+        console.log('[USEEFFECT] Price value invalid:', priceValue)
+      }
     } else {
-      console.log('Price check failed - no valid price found')
+      console.log('[USEEFFECT] No valid data to process')
+      if (stockQuote.isError) {
+        console.log('[USEEFFECT] Error state detected, not updating price')
+      }
     }
-  }, [stockQuote.data])
+  }, [stockQuote.data, stockQuote.isSuccess, stockQuote.isLoading])
 
-  // Access nested data for the change indicator
-  const actualStockData = (stockQuote.data as any)?.data
+  // Auto-populate price range when current price changes (only if not manually set)
+  useEffect(() => {
+    const price = parseFloat(currentPrice)
+
+    if (!isManualPriceRange && !isNaN(price) && price > 0) {
+      const minPrice = Math.max(0, price - 5) // Ensure min doesn't go below 0
+      const maxPrice = price + 5
+
+      setPriceRangeMin(minPrice.toFixed(2))
+      setPriceRangeMax(maxPrice.toFixed(2))
+
+      console.log('[PRICE RANGE AUTO-FILL] Set range to:', minPrice, '-', maxPrice)
+    }
+  }, [currentPrice, isManualPriceRange])
+
+  // Access stock data for the change indicator
+  const actualStockData = stockQuote.data as any
   const isPositiveChange = actualStockData && actualStockData.change >= 0
 
   return (
@@ -163,25 +309,37 @@ export function StrategyForm({ legs, onCalculate }: StrategyFormProps) {
                 <Label htmlFor="currentPrice" className="text-sm text-gray-400">
                   Current price*
                 </Label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                  <Input
-                    id="currentPrice"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={currentPrice}
-                    onChange={(e) => setCurrentPrice(e.target.value)}
-                    disabled={stockQuote.isLoading}
-                    className="pl-8 bg-dark-700 border-2 border-white/10 focus:border-primary"
-                  />
-                </div>
+                <NumberInput
+                  id="currentPrice"
+                  placeholder="0.00"
+                  value={currentPrice}
+                  onValueChange={(value) => setCurrentPrice(value.toString())}
+                  isDisabled={stockQuote.isLoading}
+                  classNames={{
+                    inputWrapper: "bg-dark-700 border-2 border-white/10 focus-within:border-primary shadow-none outline-none",
+                    input: "text-white"
+                  }}
+                  startContent={<span className="text-gray-400">$</span>}
+                  step={0.01}
+                  minValue={0}
+                  aria-label="Current stock price"
+                  formatOptions={{
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  }}
+                />
               </div>
               <div className="flex gap-3 items-center">
                 <Button
                   onClick={handleGetPrice}
                   disabled={stockQuote.isLoading || !symbol}
-                  className="shimmer-effect h-[46px] px-5 bg-gradient-to-r from-primary to-secondary hover:from-secondary hover:to-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`shimmer-effect h-[46px] px-5 bg-gradient-to-r from-primary to-secondary hover:from-secondary hover:to-primary transition-all ${
+                    stockQuote.isLoading
+                      ? 'opacity-70 cursor-wait'
+                      : !symbol
+                        ? 'opacity-50 cursor-default'
+                        : 'cursor-pointer hover:scale-105'
+                  }`}
                 >
                   {stockQuote.isLoading ? (
                     <>
@@ -192,6 +350,9 @@ export function StrategyForm({ legs, onCalculate }: StrategyFormProps) {
                     'Get price'
                   )}
                 </Button>
+                {!symbol && (
+                  <span className="text-xs text-gray-500">Enter symbol first</span>
+                )}
                 <HelpCircle className="w-4 h-4 text-gray-500 cursor-help" />
               </div>
             </div>
@@ -218,8 +379,26 @@ export function StrategyForm({ legs, onCalculate }: StrategyFormProps) {
 
             {/* Error state */}
             {stockQuote.isError && (
-              <div className="text-xs text-red-500 mt-2">
-                {stockQuote.error?.message || 'Failed to fetch price'}
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mt-3">
+                <div className="text-sm font-semibold text-red-400 mb-1">
+                  ⚠️ Failed to fetch price
+                </div>
+                <div className="text-xs text-red-300">
+                  {stockQuote.error?.message || 'Unknown error'}
+                </div>
+                <div className="text-xs text-gray-400 mt-2">
+                  Make sure the backend API server is running:
+                  <code className="block mt-1 bg-black/30 p-1 rounded">
+                    cd backend && python -m uvicorn main:app --reload
+                  </code>
+                </div>
+                <Button
+                  onClick={handleGetPrice}
+                  variant="outline"
+                  className="mt-2 text-xs h-7 border-red-500/30 text-red-400 hover:bg-red-500/10"
+                >
+                  Try Again
+                </Button>
               </div>
             )}
 
@@ -234,12 +413,18 @@ export function StrategyForm({ legs, onCalculate }: StrategyFormProps) {
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-end">
                 <div className="space-y-2">
-                  <Label htmlFor={`position-${index}`} className="text-sm text-gray-400">
-                    Buy or write
-                  </Label>
+                  <div className="space-y-1">
+                    <Label htmlFor={`position-${index}`} className="text-sm font-semibold text-white">
+                      Position
+                    </Label>
+                    <div className="text-xs text-primary font-bold uppercase tracking-wide">
+                      → Recommended: {leg.position === 'buy' ? 'Buy' : 'Write'}
+                    </div>
+                  </div>
                   <select
                     id={`position-${index}`}
-                    defaultValue={leg.position}
+                    value={legPositions[index] || leg.position}
+                    onChange={(e) => setLegPositions(prev => ({ ...prev, [index]: e.target.value as 'buy' | 'write' }))}
                     className="w-full px-4 py-3 rounded-xl bg-dark-700 border-2 border-white/10 text-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                   >
                     <option value="buy">Buy</option>
@@ -253,24 +438,28 @@ export function StrategyForm({ legs, onCalculate }: StrategyFormProps) {
                   <div className="flex gap-2">
                     <div className="flex-1 px-4 py-3 rounded-xl bg-dark-700/50 border-2 border-dashed border-white/10 text-gray-400 flex items-center justify-between">
                       {selectedOptions[index] ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-white font-medium">
-                            Strike: ${(() => {
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-white font-semibold text-lg">
+                            ${(() => {
                               const chainData = (optionsChain.data as any)?.data
                               if (!chainData) return '—'
                               const optionsList = leg.type === 'call' ? chainData.calls : chainData.puts
                               const option = optionsList?.find((opt: any) => opt.symbol === selectedOptions[index])
-                              return option ? option.strikePrice.toFixed(2) : '—'
+                              const strike = option ? option.strikePrice.toFixed(0) : '—'
+                              return `${strike} ${leg.type === 'call' ? 'Call' : 'Put'}`
                             })()}
                           </span>
                           {selectedExpiry && (
-                            <span className="text-xs text-gray-400">
-                              • Exp: {new Date(selectedExpiry).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: '2-digit'
-                              })}
-                            </span>
+                            <div className="text-right">
+                              <div className="text-xs text-gray-500 uppercase tracking-wide">Expiry</div>
+                              <div className="text-base text-gray-200 font-semibold">
+                                {new Date(selectedExpiry).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })}
+                              </div>
+                            </div>
                           )}
                         </div>
                       ) : (
@@ -294,20 +483,26 @@ export function StrategyForm({ legs, onCalculate }: StrategyFormProps) {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor={`premium-${index}`} className="text-sm text-gray-400">
-                    Price per option*
+                    Premium per contract*
                   </Label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                    <Input
-                      id={`premium-${index}`}
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={optionPremiums[index] || ''}
-                      onChange={(e) => setOptionPremiums(prev => ({ ...prev, [index]: e.target.value }))}
-                      className="pl-8 bg-dark-700 border-2 border-white/10 focus:border-primary"
-                    />
-                  </div>
+                  <NumberInput
+                    id={`premium-${index}`}
+                    placeholder="0.00"
+                    value={optionPremiums[index] || ''}
+                    onValueChange={(value) => setOptionPremiums(prev => ({ ...prev, [index]: value.toString() }))}
+                    classNames={{
+                      inputWrapper: "bg-dark-700 border-2 border-white/10 focus-within:border-primary shadow-none outline-none",
+                      input: "text-white"
+                    }}
+                    startContent={<span className="text-gray-400">$</span>}
+                    step={0.01}
+                    minValue={0}
+                    aria-label={`Premium for ${legs[index]?.label || 'option'}`}
+                    formatOptions={{
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    }}
+                  />
                   {optionPremiums[index] && selectedOptions[index] && (
                     <p className="text-xs text-green-600">✓ Auto-filled from selected option</p>
                   )}
@@ -317,20 +512,49 @@ export function StrategyForm({ legs, onCalculate }: StrategyFormProps) {
                     Contracts*
                   </Label>
                   <div className="flex items-center gap-2">
-                    <Input
+                    <NumberInput
                       id={`contracts-${index}`}
-                      type="number"
-                      min="1"
-                      defaultValue="1"
-                      className="w-24 bg-dark-700 border-2 border-white/10 focus:border-primary"
+                      value={legContracts[index] || '1'}
+                      onValueChange={(value) => setLegContracts(prev => ({ ...prev, [index]: value.toString() }))}
+                      classNames={{
+                        base: "w-24",
+                        inputWrapper: "bg-dark-700 border-2 border-white/10 focus-within:border-primary shadow-none outline-none",
+                        input: "text-white"
+                      }}
+                      minValue={1}
+                      step={1}
+                      aria-label={`Number of contracts for ${legs[index]?.label || 'option'}`}
                     />
                     <span className="text-xs text-gray-400">×100</span>
                     <HelpCircle className="w-4 h-4 text-gray-500 cursor-help" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm text-gray-400">Total cost</div>
-                  <div className="text-xl font-bold text-primary">$ 0.00</div>
+                  <div className="text-sm text-gray-400">{legs.length === 1 ? 'Total Cost' : 'Leg Cost'}</div>
+                  <div className={`text-xl font-bold ${
+                    (() => {
+                      const premium = parseFloat(optionPremiums[index] || '0');
+                      const contracts = parseFloat(legContracts[index] || '1');
+                      const position = legPositions[index] || leg.position;
+                      const isLong = position === 'buy';
+                      return isLong ? 'text-red-400' : 'text-green-400';
+                    })()
+                  }`}>
+                    {(() => {
+                      const premium = parseFloat(optionPremiums[index] || '0');
+                      const contracts = parseFloat(legContracts[index] || '1');
+                      const position = legPositions[index] || leg.position;
+                      const isLong = position === 'buy';
+                      const cost = premium * contracts * 100;
+                      return isLong ? `-$${cost.toFixed(2)}` : `+$${cost.toFixed(2)}`;
+                    })()}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {(() => {
+                      const position = legPositions[index] || leg.position;
+                      return position === 'buy' ? 'Debit' : 'Credit';
+                    })()}
+                  </div>
                 </div>
               </div>
               {index === legs.length - 1 && (
@@ -339,11 +563,96 @@ export function StrategyForm({ legs, onCalculate }: StrategyFormProps) {
             </div>
           ))}
 
+          {/* Net Spread Cost Summary - Only show for multi-leg strategies */}
+          {legs.length > 1 && (
+            <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-2 border-purple-500/30 rounded-xl p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-lg font-bold text-white mb-1">Net Spread Cost</div>
+                  <div className="text-sm text-gray-400">
+                    Combined debit/credit for all {legs.length} legs
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className={`text-3xl font-bold ${
+                    (() => {
+                      const totalCost = legs.reduce((sum, leg, index) => {
+                        const premium = parseFloat(optionPremiums[index] || '0');
+                        const contracts = parseFloat(legContracts[index] || '1');
+                        const position = legPositions[index] || leg.position;
+                        const isLong = position === 'buy';
+                        const legCost = premium * contracts * 100;
+                        return sum + (isLong ? -legCost : legCost);
+                      }, 0);
+                      return totalCost < 0 ? 'text-red-400' : 'text-green-400';
+                    })()
+                  }`}>
+                    {(() => {
+                      const totalCost = legs.reduce((sum, leg, index) => {
+                        const premium = parseFloat(optionPremiums[index] || '0');
+                        const contracts = parseFloat(legContracts[index] || '1');
+                        const position = legPositions[index] || leg.position;
+                        const isLong = position === 'buy';
+                        const legCost = premium * contracts * 100;
+                        return sum + (isLong ? -legCost : legCost);
+                      }, 0);
+                      return totalCost < 0
+                        ? `-$${Math.abs(totalCost).toFixed(2)}`
+                        : `+$${totalCost.toFixed(2)}`;
+                    })()}
+                  </div>
+                  <div className="text-sm text-gray-400 mt-1">
+                    {(() => {
+                      const totalCost = legs.reduce((sum, leg, index) => {
+                        const premium = parseFloat(optionPremiums[index] || '0');
+                        const contracts = parseFloat(legContracts[index] || '1');
+                        const position = legPositions[index] || leg.position;
+                        const isLong = position === 'buy';
+                        const legCost = premium * contracts * 100;
+                        return sum + (isLong ? -legCost : legCost);
+                      }, 0);
+                      return totalCost < 0 ? 'Net Debit (you pay)' : 'Net Credit (you receive)';
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Stock Position Input - Only show if user has added it */}
+          {stockPosition ? (
+            <StockPositionInput
+              currentStockPrice={parseFloat(currentPrice) || 100}
+              stockPosition={stockPosition || undefined}
+              onStockPositionChange={setStockPosition}
+            />
+          ) : (
+            /* Manual "Add Stock Position" button for advanced users */
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                onClick={() => {
+                  const defaultStock: StockLeg = {
+                    id: `stock-${Date.now()}`,
+                    position: Position.LONG,
+                    entryPrice: parseFloat(currentPrice) || 100,
+                    quantity: 100,
+                  };
+                  setStockPosition(defaultStock);
+                }}
+                variant="outline"
+                className="text-sm text-gray-400 border-white/10 hover:text-white hover:border-white/30"
+              >
+                + Add Stock Position (Optional)
+              </Button>
+            </div>
+          )}
+
           {/* Calculate Button */}
           <div className="pt-2">
             <div className="text-center">
               <Button
-                onClick={onCalculate}
+                onClick={handleCalculate}
                 className="shimmer-effect inline-flex items-center justify-center gap-2 px-10 py-4 rounded-xl bg-gradient-to-r from-primary via-secondary to-purple-500 text-white font-bold text-lg shadow-2xl hover:shadow-primary/50 hover:scale-105 transition-all duration-200 animate-glow-pulse"
               >
                 <Calculator className="w-5 h-5" />
@@ -352,23 +661,61 @@ export function StrategyForm({ legs, onCalculate }: StrategyFormProps) {
             </div>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm">
               <div className="text-gray-400">Stock price range:</div>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                <Input
-                  type="number"
-                  className="w-28 pl-7 bg-dark-700 border-2 border-white/10 focus:border-primary"
-                  placeholder="0"
-                />
-              </div>
+              <NumberInput
+                value={priceRangeMin}
+                onValueChange={(value) => {
+                  setPriceRangeMin(value.toString())
+                  setIsManualPriceRange(true)
+                }}
+                classNames={{
+                  base: "w-28",
+                  inputWrapper: "bg-dark-700 border-2 border-white/10 focus-within:border-primary shadow-none outline-none",
+                  input: "text-white"
+                }}
+                placeholder="Min"
+                startContent={<span className="text-gray-400">$</span>}
+                step={0.01}
+                minValue={0}
+                aria-label="Minimum price range"
+                formatOptions={{
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                }}
+              />
               <span className="text-gray-500">–</span>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                <Input
-                  type="number"
-                  className="w-28 pl-7 bg-dark-700 border-2 border-white/10 focus:border-primary"
-                  placeholder="0"
-                />
-              </div>
+              <NumberInput
+                value={priceRangeMax}
+                onValueChange={(value) => {
+                  setPriceRangeMax(value.toString())
+                  setIsManualPriceRange(true)
+                }}
+                classNames={{
+                  base: "w-28",
+                  inputWrapper: "bg-dark-700 border-2 border-white/10 focus-within:border-primary shadow-none outline-none",
+                  input: "text-white"
+                }}
+                placeholder="Max"
+                startContent={<span className="text-gray-400">$</span>}
+                step={0.01}
+                minValue={0}
+                aria-label="Maximum price range"
+                formatOptions={{
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                }}
+              />
+              {isManualPriceRange && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsManualPriceRange(false)}
+                  className="h-7 px-2 text-xs text-primary hover:text-primary/80"
+                  title="Reset to auto-fill (±$5 from current price)"
+                >
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Auto
+                </Button>
+              )}
               <HelpCircle className="w-4 h-4 text-gray-500 cursor-help" />
             </div>
             <div className="mt-4 flex items-center justify-center gap-2 text-sm">
@@ -390,65 +737,33 @@ export function StrategyForm({ legs, onCalculate }: StrategyFormProps) {
         </div>
       </div>
 
-      {/* Results Area */}
-      <div className="glass-card-strong rounded-2xl shadow-2xl mb-8 overflow-hidden animate-slide-up">
-        <div className="px-6 py-4 border-b border-white/10">
-          <h2 className="text-lg font-bold text-white">Estimated returns</h2>
-        </div>
-        <div className="p-6">
-          <div className="h-64 border-2 border-dashed border-white/20 rounded-xl flex flex-col items-center justify-center text-gray-500 text-center bg-dark-800/50">
-            <svg
-              className="w-16 h-16 mb-3 text-primary/50"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.5"
-                d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"
-              ></path>
-            </svg>
-            <div className="text-gray-400 font-medium">Profit/Loss Graph</div>
-            <div className="text-sm text-gray-500 mt-1">
-              Click calculate button above to see estimates
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Additional Chart */}
-      <div className="glass-card rounded-2xl shadow-lg mb-8 overflow-hidden">
-        <div className="h-64 flex flex-col items-center justify-center text-gray-500 text-center bg-dark-800/30">
-          <svg
-            className="w-12 h-12 mb-2 text-primary/50"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.5"
-              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-            ></path>
-          </svg>
-          <div className="text-gray-400">Additional Chart/Table View</div>
-          <div className="text-sm text-gray-500">Line Chart / Table Toggle</div>
-        </div>
-      </div>
 
       {/* Options Chain Modal */}
       {showOptionsModal !== null && (
-        <OptionsChainModal
+        <UnifiedOptionsChain
           symbol={symbol}
           optionType={legs[showOptionsModal].type}
-          onOptionSelect={(optionSymbol, premium, strike) =>
-            handleModalOptionSelect(showOptionsModal, optionSymbol, premium, strike)
+          onOptionSelect={(optionSymbol, premium, strike, expiryDate, optionType) =>
+            handleModalOptionSelect(showOptionsModal, optionSymbol, premium, strike, expiryDate, optionType)
           }
           onClose={() => setShowOptionsModal(null)}
         />
+      )}
+
+      {/* Full-Width Dashboard Charts */}
+      {results && inputs.legs.length > 0 && (
+        <div className="relative left-1/2 right-1/2 -mx-[48vw] w-[96vw] px-6 sm:px-8 lg:px-12 mt-12">
+          <DashboardCharts
+            legs={inputs.legs}
+            currentStockPrice={inputs.currentStockPrice}
+            riskFreeRate={inputs.riskFreeRate || 0.05}
+            volatility={inputs.volatility || 0.30}
+            dividendYield={0}
+            priceRangeMin={priceRangeMin ? parseFloat(priceRangeMin) : undefined}
+            priceRangeMax={priceRangeMax ? parseFloat(priceRangeMax) : undefined}
+            isLoading={isCalculating}
+          />
+        </div>
       )}
     </>
   )

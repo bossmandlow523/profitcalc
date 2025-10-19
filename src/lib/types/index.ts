@@ -85,6 +85,37 @@ export interface OptionLeg {
   premium: number;               // Premium per share in dollars
   quantity: number;              // Number of contracts
   expiryDate: Date;              // Expiration date
+  volatility?: number;           // Implied volatility for this leg (decimal, e.g., 0.30 for 30%)
+}
+
+/**
+ * Represents a stock position in a strategy
+ * (e.g., for covered calls, collars, etc.)
+ */
+export interface StockLeg {
+  id: string;                    // Unique identifier for this leg
+  position: Position;            // Long (buy) or Short (sell)
+  entryPrice: number;            // Price at which stock was bought/sold
+  quantity: number;              // Number of shares
+}
+
+/**
+ * Combined type for any position leg (option or stock)
+ */
+export type PositionLeg = OptionLeg | StockLeg;
+
+/**
+ * Type guard to check if a leg is a stock leg
+ */
+export function isStockLeg(leg: PositionLeg): leg is StockLeg {
+  return 'entryPrice' in leg && !('optionType' in leg);
+}
+
+/**
+ * Type guard to check if a leg is an option leg
+ */
+export function isOptionLeg(leg: PositionLeg): leg is OptionLeg {
+  return 'optionType' in leg;
 }
 
 /**
@@ -110,10 +141,12 @@ export interface CalculationInputs {
   // Basic Inputs
   currentStockPrice: number;     // Current underlying price
   legs: OptionLeg[];             // Array of option legs
+  stockPosition?: StockLeg;      // Optional stock position (for covered calls, collars, etc.)
 
   // Advanced Inputs (for Black-Scholes)
-  volatility?: number;           // Implied volatility (decimal, e.g., 0.30 for 30%)
+  volatility?: number;           // Default implied volatility (decimal, e.g., 0.30 for 30%)
   riskFreeRate?: number;         // Risk-free interest rate (decimal, e.g., 0.05 for 5%)
+  dividendYield?: number;        // Dividend yield (decimal, e.g., 0.02 for 2%)
 
   // Chart Configuration
   priceRange?: number;           // Range for chart (+/- percentage from current price)
@@ -152,6 +185,15 @@ export interface CalculationResults {
   // Current Value (if using theoretical pricing)
   currentValue?: number;         // Current theoretical value
   currentPL?: number;            // Current P/L vs initial cost
+
+  // Strategy Detection
+  detectedStrategy?: {
+    type: string;                // Strategy type (from strategy-detector)
+    name: string;                // Human-readable name
+    confidence: number;          // 0-1 confidence score
+    requiresStock: boolean;      // Does this strategy require stock position?
+    requiresTimeBasedCalc: boolean; // Does this need Black-Scholes?
+  };
 
   // Greeks (aggregate for all legs)
   greeks?: GreeksResult;
@@ -276,6 +318,7 @@ export interface BlackScholesParams {
   timeToExpiry: number;          // Years
   riskFreeRate: number;          // Decimal (0.05 = 5%)
   volatility: number;            // Decimal (0.30 = 30%)
+  dividendYield?: number;        // Dividend yield (decimal, 0.02 = 2%, default 0)
 }
 
 /**

@@ -10,8 +10,9 @@ import {
   OptionLeg,
   OptionType,
   Position,
+  ErrorCode
 } from '../types';
-import { CalculationError, ErrorCode } from '../types/errors';
+import { CalculationError } from '../types/errors';
 
 /**
  * Validate complete calculation inputs

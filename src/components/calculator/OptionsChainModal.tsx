@@ -21,7 +21,8 @@ export function OptionsChainModal({ symbol, onOptionSelect, onClose, optionType 
   }, [symbol, expiryDates.data, fetchExpiryDates])
 
   useEffect(() => {
-    const expiryData = (expiryDates.data as any)?.data
+    // Extract data from store state - no double nesting needed
+    const expiryData = expiryDates.data as any
     if (expiryData?.expiryDates && expiryData.expiryDates.length > 0 && !selectedExpiryTab) {
       const firstExpiry = expiryData.expiryDates[0].date
       setSelectedExpiryTab(firstExpiry)
@@ -40,8 +41,15 @@ export function OptionsChainModal({ symbol, onOptionSelect, onClose, optionType 
     onClose()
   }
 
-  const expiryData = (expiryDates.data as any)?.data
-  const chainData = (optionsChain.data as any)?.data
+  // Parse date strings as local dates to avoid timezone issues
+  const parseLocalDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number)
+    return new Date(year, month - 1, day)
+  }
+
+  // Extract data from store state - no double nesting needed
+  const expiryData = expiryDates.data as any
+  const chainData = optionsChain.data as any
   const optionsList = optionType === 'call' ? chainData?.calls : chainData?.puts
   const underlyingPrice = chainData?.underlyingPrice
 
@@ -80,7 +88,7 @@ export function OptionsChainModal({ symbol, onOptionSelect, onClose, optionType 
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
                 >
-                  {new Date(expiry.date).toLocaleDateString('en-US', {
+                  {parseLocalDate(expiry.date).toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
                     year: '2-digit'
@@ -142,16 +150,16 @@ export function OptionsChainModal({ symbol, onOptionSelect, onClose, optionType 
                         {isATM && <span className="ml-2 text-xs text-blue-400">ATM</span>}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-300">
-                        ${option.bid?.toFixed(2) || '—'}
+                        {option.bid > 0 ? `$${option.bid.toFixed(2)}` : '—'}
                       </td>
                       <td className="px-4 py-3 text-right text-white font-medium">
-                        ${option.mark?.toFixed(2) || '—'}
+                        {option.mark > 0 ? `$${option.mark.toFixed(2)}` : '—'}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-300">
-                        ${option.ask?.toFixed(2) || '—'}
+                        {option.ask > 0 ? `$${option.ask.toFixed(2)}` : '—'}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-300">
-                        ${option.lastPrice?.toFixed(2) || '—'}
+                        {option.lastPrice > 0 ? `$${option.lastPrice.toFixed(2)}` : '—'}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-400 text-sm">
                         {option.volume?.toLocaleString() || '—'}

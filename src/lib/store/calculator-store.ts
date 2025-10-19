@@ -3,11 +3,23 @@ import type {
   CalculationInputs,
   CalculationResults,
   OptionLeg,
-  OptionLegInput
+  OptionLegInput,
+  StockLeg
 } from '../types';
 import {
   StrategyType
 } from '../types';
+import {
+  calcTotalPL,
+  calcInitialCost,
+  calcStrategyMaxProfit,
+  calcStrategyMaxLoss,
+  findBreakEvens,
+  generatePLData,
+  calcIntrinsicValue,
+  calcLegPL
+} from '../calculations';
+import { detectStrategy, getStrategyName } from '../calculations/strategy-detector';
 
 interface UserPreferences {
   theme: 'light' | 'dark';
@@ -34,6 +46,7 @@ interface CalculatorStore {
   addLeg: (leg: OptionLegInput) => void;
   updateLeg: (id: string, updates: Partial<OptionLeg>) => void;
   removeLeg: (id: string) => void;
+  setStockPosition: (stockPosition: StockLeg | null) => void;
   setStrategy: (strategy: StrategyType) => void;
   calculate: () => void;
   reset: () => void;
@@ -46,6 +59,7 @@ const initialState = {
     legs: [],
     volatility: 0.30,
     riskFreeRate: 0.05,
+    dividendYield: 0.00,
     priceRange: 0.5,
     chartPoints: 100,
   },
@@ -112,6 +126,16 @@ export const useCalculatorStore = create<CalculatorStore>((set, get) => ({
     }));
   },
 
+  setStockPosition: (stockPosition) => {
+    set((state) => ({
+      inputs: {
+        ...state.inputs,
+        stockPosition: stockPosition || undefined,
+      },
+      error: null,
+    }));
+  },
+
   setStrategy: (strategy) => {
     set({
       selectedStrategy: strategy,
@@ -124,19 +148,81 @@ export const useCalculatorStore = create<CalculatorStore>((set, get) => ({
     set({ isCalculating: true, error: null });
 
     try {
-      // TODO: Connect to calculation engine
-      // For now, just create dummy results to test UI
-      const results: CalculationResults = {
-        maxProfit: null, // Unlimited
-        maxLoss: -300,
-        breakEvenPoints: [103],
-        initialCost: -300,
-        chartData: generateDummyChartData(inputs.currentStockPrice),
-        legResults: inputs.legs.map(leg => ({
+      // Validate inputs
+      if (!inputs.legs || inputs.legs.length === 0) {
+        throw new Error('Please add at least one option leg');
+      }
+
+      if (inputs.currentStockPrice <= 0) {
+        throw new Error('Current stock price must be greater than 0');
+      }
+
+      // Detect strategy type
+      const hasStock = !!inputs.stockPosition;
+      const detection = detectStrategy(inputs.legs, hasStock);
+      const strategyName = getStrategyName(detection.type);
+
+      // Warn if strategy requires stock but none provided
+      if (detection.requiresStock && !hasStock && detection.confidence >= 0.8) {
+        console.warn(`Strategy "${strategyName}" typically requires a stock position`);
+      }
+
+      // Calculate initial cost/credit
+      const initialCost = calcInitialCost(inputs.legs);
+
+      // Calculate max profit and max loss
+      const maxProfit = calcStrategyMaxProfit(inputs.legs, inputs.currentStockPrice);
+      const maxLoss = calcStrategyMaxLoss(inputs.legs, inputs.currentStockPrice);
+
+      // Find break-even points
+      const breakEvenPoints = findBreakEvens(
+        inputs.legs,
+        inputs.currentStockPrice,
+        inputs.priceRange || 0.5
+      );
+
+      // Generate chart data
+      const chartData = generatePLData(inputs.legs, inputs.currentStockPrice, {
+        priceRange: inputs.priceRange,
+        points: inputs.chartPoints,
+        showTimeValue: false
+      });
+
+      // Calculate individual leg results
+      const legResults = inputs.legs.map(leg => {
+        const intrinsicValue = calcIntrinsicValue(
+          leg.optionType,
+          inputs.currentStockPrice,
+          leg.strikePrice
+        );
+        const profitLoss = calcLegPL(leg, inputs.currentStockPrice);
+
+        return {
           legId: leg.id,
-          intrinsicValue: 0,
-          profitLoss: 0,
-        })),
+          intrinsicValue,
+          profitLoss,
+        };
+      });
+
+      // Calculate current total P/L at current price
+      const currentPL = calcTotalPL(inputs.legs, inputs.currentStockPrice);
+
+      const results: CalculationResults = {
+        maxProfit,
+        maxLoss,
+        breakEvenPoints,
+        initialCost,
+        currentValue: currentPL + initialCost,
+        currentPL,
+        detectedStrategy: {
+          type: detection.type,
+          name: strategyName,
+          confidence: detection.confidence,
+          requiresStock: detection.requiresStock,
+          requiresTimeBasedCalc: detection.requiresTimeBasedCalc,
+        },
+        chartData,
+        legResults,
       };
 
       set({ results, isCalculating: false, error: null });
@@ -159,21 +245,3 @@ export const useCalculatorStore = create<CalculatorStore>((set, get) => ({
     }));
   },
 }));
-
-// Temporary dummy chart data generator
-function generateDummyChartData(currentPrice: number) {
-  const data = [];
-  const minPrice = currentPrice * 0.5;
-  const maxPrice = currentPrice * 1.5;
-  const step = (maxPrice - minPrice) / 100;
-
-  for (let price = minPrice; price <= maxPrice; price += step) {
-    const pl = Math.max(0, price - (currentPrice + 5)) * 100 - 300;
-    data.push({
-      stockPrice: Math.round(price * 100) / 100,
-      profitLoss: Math.round(pl * 100) / 100,
-    });
-  }
-
-  return data;
-}

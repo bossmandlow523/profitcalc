@@ -3,6 +3,7 @@ import { Header } from './components/layout/Header'
 import { Footer } from './components/layout/Footer'
 import { HomePage } from './components/home/HomePage'
 import { CalculatorPage } from './components/calculator/CalculatorPage'
+import { AnimatedGridPattern } from './components/ui/animated-grid-pattern'
 
 function App() {
   const [currentPage, setCurrentPage] = useState<'home' | 'calculator'>('home')
@@ -28,19 +29,27 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col relative">
-      {/* Background Grid */}
-      <div className="fixed inset-0 grid-bg pointer-events-none"></div>
+      {/* Animated Background Grid */}
+      <AnimatedGridPattern
+        numSquares={40}
+        maxOpacity={0.6}
+        duration={3}
+        repeatDelay={1}
+        className="fixed inset-0 h-full w-full [mask-image:radial-gradient(ellipse_at_center,white,transparent_85%)]"
+      />
 
       {/* Main Content */}
       <Header onNavigate={handleNavigate} currentPage={currentPage} />
-      {currentPage === 'home' ? (
-        <HomePage onSelectStrategy={handleSelectStrategy} />
-      ) : (
-        <CalculatorPage
-          selectedStrategy={selectedStrategy}
-          onBackToHome={handleBackToHome}
-        />
-      )}
+      <div className="pt-16">
+        {currentPage === 'home' ? (
+          <HomePage onSelectStrategy={handleSelectStrategy} />
+        ) : (
+          <CalculatorPage
+            selectedStrategy={selectedStrategy}
+            onBackToHome={handleBackToHome}
+          />
+        )}
+      </div>
       <Footer />
     </div>
   )
