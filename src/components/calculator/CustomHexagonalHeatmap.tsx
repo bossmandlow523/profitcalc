@@ -4,7 +4,6 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { red, green, orange } from '@mui/material/colors'
 
 interface CustomHexagonalHeatmapProps {
   data: number[][] // [priceIndex][dateIndex]
@@ -113,21 +112,24 @@ export function CustomHexagonalHeatmap({
 
   /**
    * Get color for a value using diverging color scale
+   * Clear red (loss) to green (profit) gradient
    */
   const getColor = (value: number): string => {
     const range = Math.max(Math.abs(minValue), Math.abs(maxValue))
-    if (range === 0) return orange[500]
+    if (range === 0) return '#404040' // dark gray for neutral
 
     const normalized = value / range // -1 to 1
 
     if (normalized > 0) {
-      // Positive - interpolate from orange to green
+      // Positive - interpolate from dark gray to custom neon green
       const t = Math.min(normalized, 1)
-      return interpolateColor(orange[500], green[700], t)
-    } else {
-      // Negative - interpolate from orange to red
+      return interpolateColor('#404040', '#3a9447', t) // dark gray to green base
+    } else if (normalized < 0) {
+      // Negative - interpolate from dark gray to bright red
       const t = Math.min(Math.abs(normalized), 1)
-      return interpolateColor(orange[500], red[700], t)
+      return interpolateColor('#404040', '#DC2626', t) // dark gray to red-600
+    } else {
+      return '#404040' // exactly zero
     }
   }
 
@@ -187,9 +189,9 @@ export function CustomHexagonalHeatmap({
    * Generate legend gradient stops
    */
   const legendStops = [
-    { offset: '0%', color: red[700], label: minValue?.toFixed(0) || '0' },
-    { offset: '50%', color: orange[500], label: '0' },
-    { offset: '100%', color: green[700], label: maxValue?.toFixed(0) || '0' }
+    { offset: '0%', color: '#DC2626', label: minValue?.toFixed(0) || '0' }, // red (loss)
+    { offset: '50%', color: '#404040', label: '0' }, // dark gray (breakeven)
+    { offset: '100%', color: '#07eb29', label: maxValue?.toFixed(0) || '0' } // bright neon green (profit)
   ]
 
   return (
@@ -206,9 +208,9 @@ export function CustomHexagonalHeatmap({
         <defs>
           {/* Gradient for legend */}
           <linearGradient id="heatmapGradient" x1="0%" y1="100%" x2="0%" y2="0%">
-            <stop offset="0%" stopColor={red[700]} />
-            <stop offset="50%" stopColor={orange[500]} />
-            <stop offset="100%" stopColor={green[700]} />
+            <stop offset="0%" stopColor="#DC2626" />
+            <stop offset="50%" stopColor="#404040" />
+            <stop offset="100%" stopColor="#07eb29" />
           </linearGradient>
         </defs>
 
@@ -382,6 +384,7 @@ export function CustomHexagonalHeatmap({
         </g>
 
         {/* Axis lines */}
+        {/* Y-axis: from top to bottom */}
         <line
           x1={leftPadding}
           y1={topPadding}
@@ -390,10 +393,11 @@ export function CustomHexagonalHeatmap({
           stroke="#333333"
           strokeWidth={1}
         />
+        {/* X-axis: dynamically bound to grid - from center of first column to center of last column */}
         <line
-          x1={leftPadding}
+          x1={leftPadding + hexWidth / 2}
           y1={topPadding}
-          x2={svgWidth - rightPadding}
+          x2={leftPadding + (cols - 1) * hexWidth + hexWidth / 2}
           y2={topPadding}
           stroke="#333333"
           strokeWidth={1}

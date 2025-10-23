@@ -118,6 +118,21 @@ export function generateHeatmapData(
         // Use leg-specific IV if available, otherwise use default
         const legVolatility = leg.volatility ?? volatility
 
+        // Debug logging for first calculation
+        if (priceIdx === 0 && dateIdx === 0) {
+          console.log('🔍 Heatmap Debug:', {
+            testPrice: testPrice.toFixed(2),
+            testDate: testDate.toISOString().split('T')[0],
+            strike: leg.strikePrice,
+            premium: leg.premium,
+            timeToExpiry: timeToExpiry.toFixed(4),
+            'leg.volatility': leg.volatility,
+            legVolatility: legVolatility.toFixed(4),
+            defaultVolatility: volatility.toFixed(4),
+            usingLegSpecificIV: leg.volatility !== undefined
+          })
+        }
+
         let legValue: number
 
         if (timeToExpiry <= 0) {
@@ -143,6 +158,17 @@ export function generateHeatmapData(
         // Convert to per-contract value and adjust for position
         const contractValue = legValue * 100 * leg.quantity
         totalValue += leg.position === Position.LONG ? contractValue : -contractValue
+
+        // Debug logging for first calculation
+        if (priceIdx === 0 && dateIdx === 0) {
+          console.log('💰 Option Value:', {
+            legValue: legValue.toFixed(4),
+            contractValue: contractValue.toFixed(2),
+            position: leg.position,
+            totalValue: totalValue.toFixed(2),
+            initialCost: initialCost.toFixed(2)
+          })
+        }
       }
 
       row.push(Math.round(totalValue))

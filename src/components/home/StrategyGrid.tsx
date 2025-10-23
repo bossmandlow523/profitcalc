@@ -73,12 +73,16 @@ export function StrategyGrid({ onSelectStrategy }: StrategyGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-slide-up relative z-20 pb-8">
-      {Object.entries(strategies).map(([key, strategy]) => (
+    <div className="flex justify-center">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 relative z-20 pb-8 max-w-7xl scale-[1.07]">
+        {Object.entries(strategies).map(([key, strategy], index) => (
         <Card
           key={key}
-          className="relative group overflow-hidden hover:-translate-y-1 transition-all duration-500 backdrop-blur-[2px] bg-background/20"
+          className="relative group overflow-hidden hover:-translate-y-1 transition-transform duration-200 ease-out backdrop-blur-[2px] bg-background/20 animate-in fade-in slide-in-from-bottom-4 will-change-transform"
           style={{
+            animationDelay: `${index * 100}ms`,
+            animationDuration: '400ms',
+            animationFillMode: 'backwards',
             border: 'none',
             boxShadow: `
               0 0 6px rgba(0,0,0,0.03),
@@ -135,7 +139,7 @@ export function StrategyGrid({ onSelectStrategy }: StrategyGridProps) {
                 key={item}
                 glowColor={strategy.glowColor}
                 onClick={() => handleClick(item)}
-                className="hover:scale-[1.02] active:scale-98 transition-transform"
+                className="hover:scale-[1.02] active:scale-98 transition-transform duration-150 ease-out will-change-transform"
               >
                 <span>{item}</span>
                 <svg
@@ -153,7 +157,8 @@ export function StrategyGrid({ onSelectStrategy }: StrategyGridProps) {
             ))}
           </CardContent>
         </Card>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }

@@ -25,6 +25,9 @@ interface PLHeatmapProps {
   priceRangeMax?: number
   priceSteps?: number
   dateSteps?: number
+  adaptiveDateSteps?: boolean // Enable automatic DTE-based dateSteps optimization
+  adaptivePriceSteps?: boolean // Enable automatic space-based priceSteps optimization
+  containerHeight?: number // Container height for adaptive price step calculation
 }
 
 export function PLHeatmap({
@@ -37,8 +40,11 @@ export function PLHeatmap({
   isLoading = false,
   priceRangeMin,
   priceRangeMax,
-  priceSteps = 15,
-  dateSteps = 25
+  priceSteps = 9,
+  dateSteps = 25,
+  adaptiveDateSteps = true,
+  adaptivePriceSteps = true,
+  containerHeight = 750
 }: PLHeatmapProps) {
   const [, setResizeCounter] = useState(0)
 
@@ -59,6 +65,61 @@ export function PLHeatmap({
 
   const heatmapData = useMemo(() => {
     if (legs.length === 0) return null
+
+    // Calculate days to expiry (DTE)
+    const earliestExpiry = legs.reduce((earliest, leg) => {
+      return leg.expiryDate < earliest ? leg.expiryDate : earliest
+    }, legs[0]!.expiryDate)
+    const today = new Date()
+    const daysToExpiry = Math.max(1, Math.floor((earliestExpiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)))
+
+    // Adaptive dateSteps based on DTE - maximize horizontal space usage
+    let effectiveDateSteps = dateSteps
+    if (adaptiveDateSteps) {
+      if (daysToExpiry <= 7) {
+        // Very short-term: 0-7 days - maximize space with 40-50 columns
+        effectiveDateSteps = Math.min(50, Math.max(40, daysToExpiry * 7))
+      } else if (daysToExpiry <= 14) {
+        // Short-term: 8-14 days - high granularity
+        effectiveDateSteps = 40
+      } else if (daysToExpiry <= 30) {
+        // Medium-short: 15-30 days
+        effectiveDateSteps = 35
+      } else if (daysToExpiry <= 60) {
+        // Medium-term: 31-60 days
+        effectiveDateSteps = 30
+      } else if (daysToExpiry <= 90) {
+        // Medium-long: 61-90 days
+        effectiveDateSteps = 25
+      } else {
+        // Long-term: 90+ days - avoid overcrowding
+        effectiveDateSteps = 20
+      }
+    }
+
+    // Adaptive priceSteps based on available vertical space
+    let effectivePriceSteps = priceSteps
+    if (adaptivePriceSteps) {
+      // Calculate available height for hexagons
+      const topPadding = Math.max(40, containerHeight * 0.08)
+      const bottomPadding = Math.max(20, containerHeight * 0.03)
+      const availableHeight = containerHeight - topPadding - bottomPadding
+
+      // Minimum hex radius for readable labels and good visibility
+      const minHexRadius = 20 // Increased to keep hexagons visible
+      const minHexHeight = minHexRadius * 1.5
+
+      // Calculate maximum rows that fit with minimum hex size
+      // Formula: availableHeight = rows * hexHeight = rows * (radius * 1.5)
+      // Accounting for honeycomb overlap: availableHeight >= rows * 1.5 * minRadius + 0.5 * minRadius
+      const maxRowsThatFit = Math.floor((availableHeight - 0.5 * minHexRadius) / minHexHeight)
+
+      // Use the smaller of: what fits or what was requested, but at least 9
+      effectivePriceSteps = Math.max(9, Math.min(maxRowsThatFit, 20)) // Cap at 20 for balance between granularity and size
+    } else {
+      // Manual mode: just enforce minimum
+      effectivePriceSteps = Math.max(9, priceSteps)
+    }
 
     // Calculate price range
     let priceRangePercent: number
@@ -83,12 +144,12 @@ export function PLHeatmap({
       volatility,
       dividendYield,
       priceRangePercent,
-      priceSteps,
-      dateSteps,
+      effectivePriceSteps,
+      effectiveDateSteps,
       customMin,
       customMax
     )
-  }, [legs, currentStockPrice, riskFreeRate, volatility, dividendYield, priceRangeMin, priceRangeMax, priceSteps, dateSteps])
+  }, [legs, currentStockPrice, riskFreeRate, volatility, dividendYield, priceRangeMin, priceRangeMax, priceSteps, dateSteps, adaptiveDateSteps, adaptivePriceSteps, containerHeight])
 
   // Get month header for display
   const monthHeader = useMemo(() => {
@@ -109,10 +170,8 @@ export function PLHeatmap({
 
   const yAxisData = useMemo(() => {
     if (!heatmapData) return []
-    // Show every 2nd price label to avoid crowding
-    return heatmapData.prices.map((price, idx) =>
-      idx % 2 === 0 ? `$${price.toFixed(2)}` : ''
-    )
+    // Show all price labels
+    return heatmapData.prices.map((price) => `$${price.toFixed(2)}`)
   }, [heatmapData])
 
   // Calculate statistics

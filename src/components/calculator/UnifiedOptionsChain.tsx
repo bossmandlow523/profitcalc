@@ -11,7 +11,7 @@ import { CircularProgressCombined } from '@/components/ui/circular-progress'
 
 interface UnifiedOptionsChainProps {
   symbol: string
-  onOptionSelect: (optionSymbol: string, premium: number, strike: number, expiryDate: string, optionType: 'call' | 'put') => void
+  onOptionSelect: (optionSymbol: string, premium: number, strike: number, expiryDate: string, optionType: 'call' | 'put', impliedVolatility?: number) => void
   onClose: () => void
   optionType: 'call' | 'put'
 }
@@ -72,7 +72,8 @@ export function UnifiedOptionsChain({
 
   const handleRowClick = (option: any, type: 'call' | 'put') => {
     const premium = option.mark || option.lastPrice || 0
-    onOptionSelect(option.symbol, premium, option.strikePrice, selectedExpiryTab, type)
+    const impliedVolatility = option.impliedVolatility
+    onOptionSelect(option.symbol, premium, option.strikePrice, selectedExpiryTab, type, impliedVolatility)
     onClose()
   }
 
@@ -378,17 +379,17 @@ export function UnifiedOptionsChain({
       onTouchMove={(e) => e.stopPropagation()}
     >
       <div
-        className="glass-card-strong rounded-2xl border border-primary/30 shadow-2xl max-w-6xl w-full max-h-[92vh] overflow-hidden flex flex-col"
+        className="glass-card-strong rounded-2xl border border-primary/30 shadow-2xl max-w-full md:max-w-6xl w-full mx-2 md:mx-auto max-h-[95vh] md:max-h-[92vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
         onWheel={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10 bg-gradient-to-r from-primary/10 to-secondary/10">
+        <div className="flex items-center justify-between p-4 md:p-6 border-b border-white/10 bg-gradient-to-r from-primary/10 to-secondary/10">
           <div>
-            <h3 className="text-xl font-bold text-white">
+            <h3 className="text-lg md:text-xl font-bold text-white">
               {symbol} Options Chain
             </h3>
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="text-xs md:text-sm text-gray-400 mt-1">
               Calls & Puts •
               {underlyingPrice && <span> Current Price: <span className="text-white font-semibold">${underlyingPrice.toFixed(2)}</span></span>}
             </p>
@@ -403,7 +404,7 @@ export function UnifiedOptionsChain({
 
         {/* Expiry Date Tabs with Calendar Filter */}
         <div className="border-b border-white/10 bg-background/50 backdrop-blur-sm flex-shrink-0">
-          <div className="flex items-center gap-4 p-4">
+          <div className="flex flex-wrap items-center gap-2 md:gap-4 p-2 md:p-4">
             {/* Left Arrow - Previous Month */}
             <button
               onClick={handlePreviousMonth}
@@ -419,13 +420,13 @@ export function UnifiedOptionsChain({
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-primary/20 to-secondary/20 border-2 border-primary/30 hover:border-primary hover:bg-primary/10 transition-all text-white font-medium"
+                  className="flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2.5 rounded-lg bg-gradient-to-r from-primary/20 to-secondary/20 border-2 border-primary/30 hover:border-primary hover:bg-primary/10 transition-all text-white font-medium"
                 >
-                  <CalendarIcon className="w-4 h-4" />
-                  <span className="text-sm">
+                  <CalendarIcon className="w-3 md:w-4 h-3 md:h-4" />
+                  <span className="text-xs md:text-sm">
                     {selectedMonth
                       ? selectedMonth.toLocaleDateString('en-US', {
-                          month: 'long',
+                          month: 'short',
                           year: 'numeric'
                         })
                       : 'All Months'}
@@ -468,7 +469,7 @@ export function UnifiedOptionsChain({
                     fetchOptionsChain(symbol, firstExpiry)
                   }
                 }}
-                className="ml-auto px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500/20 to-blue-600/20 border border-blue-400/30 hover:border-blue-400 hover:bg-blue-500/30 text-blue-300 text-sm font-medium transition-all"
+                className="ml-auto px-2 md:px-4 py-1.5 md:py-2 rounded-lg bg-gradient-to-r from-blue-500/20 to-blue-600/20 border border-blue-400/30 hover:border-blue-400 hover:bg-blue-500/30 text-blue-300 text-xs md:text-sm font-medium transition-all"
               >
                 See All
               </button>
@@ -570,36 +571,36 @@ export function UnifiedOptionsChain({
               <thead className="bg-dark-900 sticky top-0 z-10">
                 {/* Section Headers */}
                 <tr className="border-b border-white/10">
-                  <th colSpan={6} className="px-4 py-2 text-center font-bold text-white text-sm uppercase tracking-wide bg-gradient-to-r from-green-500/10 to-green-500/5">
+                  <th colSpan={6} className="px-2 md:px-4 py-1 md:py-2 text-center font-bold text-white text-xs md:text-sm uppercase tracking-wide bg-gradient-to-r from-green-500/10 to-green-500/5">
                     Calls
                   </th>
-                  <th className="px-4 py-2 bg-dark-800/80"></th>
-                  <th colSpan={6} className="px-4 py-2 text-center font-bold text-white text-sm uppercase tracking-wide bg-gradient-to-l from-red-500/10 to-red-500/5">
+                  <th className="px-2 md:px-4 py-1 md:py-2 bg-dark-800/80"></th>
+                  <th colSpan={6} className="px-2 md:px-4 py-1 md:py-2 text-center font-bold text-white text-xs md:text-sm uppercase tracking-wide bg-gradient-to-l from-red-500/10 to-red-500/5">
                     Puts
                   </th>
                 </tr>
                 {/* Column Headers */}
-                <tr className="text-[10px] uppercase tracking-wider border-b-2 border-white/20">
+                <tr className="text-[9px] md:text-[10px] uppercase tracking-wider border-b-2 border-white/20">
                   {/* CALLS Side Headers - IV, OI, Vol (outer), then Ask, Mid, Bid (inner/closest to strike, right to left) */}
-                  <th className="px-3 py-3 text-left font-bold text-purple-400 bg-dark-900 w-16">IV</th>
-                  <th className="px-3 py-3 text-left font-bold text-cyan-400 bg-dark-900 w-20">OI</th>
-                  <th className="px-3 py-3 text-left font-bold text-gray-400 bg-dark-900 w-16">Vol</th>
-                  <th className="px-4 py-3 text-right font-bold text-white bg-dark-900 w-20">Ask</th>
-                  <th className="px-4 py-3 text-center font-bold text-white bg-dark-900 w-20">Mid</th>
-                  <th className="px-4 py-3 text-right font-bold text-white bg-dark-900 w-20">Bid</th>
+                  <th className="hidden md:table-cell px-3 py-3 text-left font-bold text-purple-400 bg-dark-900 w-16">IV</th>
+                  <th className="hidden md:table-cell px-3 py-3 text-left font-bold text-cyan-400 bg-dark-900 w-20">OI</th>
+                  <th className="hidden md:table-cell px-3 py-3 text-left font-bold text-gray-400 bg-dark-900 w-16">Vol</th>
+                  <th className="px-2 md:px-4 py-2 md:py-3 text-right font-bold text-white bg-dark-900 md:w-20">Ask</th>
+                  <th className="px-2 md:px-4 py-2 md:py-3 text-center font-bold text-white bg-dark-900 md:w-20">Mid</th>
+                  <th className="px-2 md:px-4 py-2 md:py-3 text-right font-bold text-white bg-dark-900 md:w-20">Bid</th>
 
                   {/* Strike Price Center */}
-                  <th className="px-6 py-3 text-center font-bold text-white bg-gradient-to-r from-dark-800 to-dark-800 border-x-2 border-primary/30 w-28">
+                  <th className="px-3 md:px-6 py-2 md:py-3 text-center font-bold text-white bg-gradient-to-r from-dark-800 to-dark-800 border-x-2 border-primary/30 md:w-28">
                     Strike
                   </th>
 
                   {/* PUTS Side Headers - Bid, Mid, Ask (inner/closest to strike, left to right), then Vol, OI, IV (outer) */}
-                  <th className="px-4 py-3 text-left font-bold text-white bg-dark-900 w-20">Bid</th>
-                  <th className="px-4 py-3 text-center font-bold text-white bg-dark-900 w-20">Mid</th>
-                  <th className="px-4 py-3 text-right font-bold text-white bg-dark-900 w-20">Ask</th>
-                  <th className="px-3 py-3 text-right font-bold text-gray-400 bg-dark-900 w-16">Vol</th>
-                  <th className="px-3 py-3 text-right font-bold text-cyan-400 bg-dark-900 w-20">OI</th>
-                  <th className="px-3 py-3 text-right font-bold text-purple-400 bg-dark-900 w-16">IV</th>
+                  <th className="px-2 md:px-4 py-2 md:py-3 text-left font-bold text-white bg-dark-900 md:w-20">Bid</th>
+                  <th className="px-2 md:px-4 py-2 md:py-3 text-center font-bold text-white bg-dark-900 md:w-20">Mid</th>
+                  <th className="px-2 md:px-4 py-2 md:py-3 text-right font-bold text-white bg-dark-900 md:w-20">Ask</th>
+                  <th className="hidden md:table-cell px-3 py-3 text-right font-bold text-gray-400 bg-dark-900 w-16">Vol</th>
+                  <th className="hidden md:table-cell px-3 py-3 text-right font-bold text-cyan-400 bg-dark-900 w-20">OI</th>
+                  <th className="hidden md:table-cell px-3 py-3 text-right font-bold text-purple-400 bg-dark-900 w-16">IV</th>
                 </tr>
               </thead>
               <tbody>

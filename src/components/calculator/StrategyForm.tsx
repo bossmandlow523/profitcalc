@@ -26,6 +26,7 @@ export function StrategyForm({ legs }: StrategyFormProps) {
   const [legPositions, setLegPositions] = useState<Record<number, 'buy' | 'write'>>({})
   const [legContracts, setLegContracts] = useState<Record<number, string>>({})
   const [legStrikes, setLegStrikes] = useState<Record<number, number>>({})
+  const [legIVs, setLegIVs] = useState<Record<number, number | undefined>>({})
   const [priceRangeMin, setPriceRangeMin] = useState('')
   const [priceRangeMax, setPriceRangeMax] = useState('')
   const [isManualPriceRange, setIsManualPriceRange] = useState(false)
@@ -143,11 +144,13 @@ export function StrategyForm({ legs }: StrategyFormProps) {
     }
   }
 
-  const handleModalOptionSelect = (legIndex: number, optionSymbol: string, premium: number, strike: number, expiryDate: string, optionType: 'call' | 'put') => {
+  const handleModalOptionSelect = (legIndex: number, optionSymbol: string, premium: number, strike: number, expiryDate: string, optionType: 'call' | 'put', impliedVolatility?: number) => {
     setSelectedOptions(prev => ({ ...prev, [legIndex]: optionSymbol }))
-    // API returns per-contract pricing (already multiplied by 100)
+    // API returns per-share pricing
     setOptionPremiums(prev => ({ ...prev, [legIndex]: premium.toFixed(2) }))
     setLegStrikes(prev => ({ ...prev, [legIndex]: strike }))
+    // Store IV for each leg
+    setLegIVs(prev => ({ ...prev, [legIndex]: impliedVolatility }))
     setSelectedExpiry(expiryDate)
     setShowOptionsModal(null)
   }
@@ -186,7 +189,8 @@ export function StrategyForm({ legs }: StrategyFormProps) {
         strikePrice: strike,
         premium: premium,
         quantity: contracts,
-        expiryDate: new Date(selectedExpiry)
+        expiryDate: new Date(selectedExpiry),
+        volatility: legIVs[index] // Use leg-specific IV if available
       }
     })
 
@@ -407,130 +411,170 @@ export function StrategyForm({ legs }: StrategyFormProps) {
 
           {/* Dynamic Option Legs */}
           {legs.map((leg, index) => (
-            <div key={index}>
-              <div className="text-base font-semibold mb-4 text-white">
-                {leg.label} {legs.length > 1 ? `#${index + 1}` : ''}
+            <div key={index} className="bg-dark-800/50 border border-white/10 rounded-2xl overflow-hidden">
+              {/* Header - Purple Banner */}
+              <div className="bg-gradient-to-r from-purple-600/20 via-purple-500/20 to-purple-600/20 border-b border-purple-500/30 py-6">
+                <div className="max-w-2xl mx-auto text-center px-8">
+                  <h2 className="text-3xl font-bold text-white mb-1">
+                    {leg.type === 'call' ? 'Call' : 'Put'} Option
+                  </h2>
+                  <p className="text-gray-300 text-sm">
+                    ({leg.type === 'call' ? 'Call' : 'Put'} Option)
+                  </p>
+                </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-end">
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <Label htmlFor={`position-${index}`} className="text-sm font-semibold text-white">
-                      Position
-                    </Label>
-                    <div className="text-xs text-primary font-bold uppercase tracking-wide">
-                      → Recommended: {leg.position === 'buy' ? 'Buy' : 'Write'}
+
+              {/* Content */}
+              <div className="p-8">
+
+              {/* Two column layout */}
+              <div className="grid lg:grid-cols-2 gap-8">
+                {/* Left column - Position & Inputs */}
+                <div className="space-y-6">
+                  {/* Position */}
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-2">Position</h3>
+                    <div className="text-sm text-primary font-bold uppercase tracking-wide mb-3">
+                      RECOMMENDED: {leg.position === 'buy' ? 'BUY' : 'WRITE'}
+                    </div>
+                    <select
+                      id={`position-${index}`}
+                      value={legPositions[index] || leg.position}
+                      onChange={(e) => setLegPositions(prev => ({ ...prev, [index]: e.target.value as 'buy' | 'write' }))}
+                      className="w-full px-4 py-3 rounded-xl bg-dark-700 border-2 border-white/10 text-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                    >
+                      <option value="buy">Buy</option>
+                      <option value="write">Write</option>
+                    </select>
+                  </div>
+
+                  {/* Premium per contract */}
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-3">Premium per contract*</h3>
+                    <NumberInput
+                      id={`premium-${index}`}
+                      placeholder="0.00"
+                      value={optionPremiums[index] || ''}
+                      onValueChange={(value) => setOptionPremiums(prev => ({ ...prev, [index]: value.toString() }))}
+                      classNames={{
+                        inputWrapper: "bg-dark-700 border-2 border-white/10 focus-within:border-primary shadow-none outline-none h-12",
+                        input: "text-white text-lg"
+                      }}
+                      startContent={<span className="text-gray-400 text-lg">$</span>}
+                      step={0.01}
+                      minValue={0}
+                      aria-label={`Premium for ${legs[index]?.label || 'option'}`}
+                      formatOptions={{
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      }}
+                    />
+                    {optionPremiums[index] && selectedOptions[index] && (
+                      <p className="text-xs text-green-500 mt-2 flex items-center gap-1">
+                        <span>✓</span> Auto-filled from selected option
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Contracts */}
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-3">Contracts*</h3>
+                    <div className="flex items-center gap-3">
+                      <NumberInput
+                        id={`contracts-${index}`}
+                        value={legContracts[index] || '1'}
+                        onValueChange={(value) => setLegContracts(prev => ({ ...prev, [index]: value.toString() }))}
+                        classNames={{
+                          base: "w-32",
+                          inputWrapper: "bg-dark-700 border-2 border-white/10 focus-within:border-primary shadow-none outline-none h-12",
+                          input: "text-white text-lg text-center"
+                        }}
+                        minValue={1}
+                        step={1}
+                        aria-label={`Number of contracts for ${legs[index]?.label || 'option'}`}
+                      />
+                      <span className="text-sm text-gray-400">×100</span>
+                      <HelpCircle className="w-4 h-4 text-gray-500 cursor-help" />
                     </div>
                   </div>
-                  <select
-                    id={`position-${index}`}
-                    value={legPositions[index] || leg.position}
-                    onChange={(e) => setLegPositions(prev => ({ ...prev, [index]: e.target.value as 'buy' | 'write' }))}
-                    className="w-full px-4 py-3 rounded-xl bg-dark-700 border-2 border-white/10 text-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                  >
-                    <option value="buy">Buy</option>
-                    <option value="write">Write</option>
-                  </select>
+
+                  <div className="text-xs text-gray-500">* Manual settings</div>
                 </div>
-                <div className="space-y-2 col-span-2">
-                  <Label htmlFor={`optionSelect-${index}`} className="text-sm text-gray-400">
+
+                {/* Right column - Selected Option Card */}
+                <div className="space-y-3">
+                  <h3 className="text-base font-semibold text-white text-center">
                     Selected Option ({leg.type === 'call' ? 'Call' : 'Put'})
-                  </Label>
-                  <div className="flex gap-2">
-                    <div className="flex-1 px-4 py-3 rounded-xl bg-dark-700/50 border-2 border-dashed border-white/10 text-gray-400 flex items-center justify-between">
-                      {selectedOptions[index] ? (
-                        <div className="flex items-center justify-between w-full">
-                          <span className="text-white font-semibold text-lg">
-                            ${(() => {
-                              const chainData = (optionsChain.data as any)?.data
-                              if (!chainData) return '—'
-                              const optionsList = leg.type === 'call' ? chainData.calls : chainData.puts
-                              const option = optionsList?.find((opt: any) => opt.symbol === selectedOptions[index])
-                              const strike = option ? option.strikePrice.toFixed(0) : '—'
-                              return `${strike} ${leg.type === 'call' ? 'Call' : 'Put'}`
-                            })()}
-                          </span>
-                          {selectedExpiry && (
-                            <div className="text-right">
-                              <div className="text-xs text-gray-500 uppercase tracking-wide">Expiry</div>
-                              <div className="text-base text-gray-200 font-semibold">
-                                {new Date(selectedExpiry).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  year: 'numeric'
-                                })}
-                              </div>
+                  </h3>
+
+                  {/* Option display card */}
+                  <div className="bg-dark-900 border-2 border-dashed border-white/20 rounded-xl p-6">
+                    {selectedOptions[index] ? (
+                      <div className="space-y-4">
+                        {/* Main option display */}
+                        <div className="text-center">
+                          <div className="text-4xl font-bold text-white mb-1">
+                            ${legStrikes[index]?.toFixed(0) || '0'} {leg.type === 'call' ? 'Call' : 'Put'}
+                          </div>
+                          {optionPremiums[index] && (
+                            <div className="text-sm text-gray-400 mt-2">
+                              Premium: ${optionPremiums[index]}
                             </div>
                           )}
                         </div>
-                      ) : (
-                        <span>No option selected - Click the table icon →</span>
-                      )}
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={() => setShowOptionsModal(index)}
-                      disabled={!symbol}
-                      className="px-6 py-3 bg-gradient-to-r from-primary/20 to-secondary/20 border-2 border-primary/30 hover:border-primary hover:bg-primary/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="View full options chain with dates"
-                    >
-                      <Table2 className="w-5 h-5 text-primary" />
-                      <span className="ml-2 text-sm font-medium">Browse Options</span>
-                    </Button>
+
+                        {/* Expiry date */}
+                        {selectedExpiry && (
+                          <div className="text-right">
+                            <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                              EXPIRY
+                            </div>
+                            <div className="text-xl text-gray-200 font-semibold">
+                              {(() => {
+                                // Parse date as UTC to avoid timezone shifts
+                                const [year, month, day] = selectedExpiry.split('-').map(Number);
+                                const date = new Date(year, month - 1, day);
+                                return date.toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                });
+                              })()}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6">
+                        <div className="text-gray-400 mb-2">No option selected</div>
+                        <div className="text-sm text-gray-500">
+                          Click "Browse Options" to view all dates
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-gray-500">
+
+                  {/* Browse button */}
+                  <Button
+                    type="button"
+                    onClick={() => setShowOptionsModal(index)}
+                    disabled={!symbol}
+                    className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="View full options chain with dates"
+                  >
+                    Browse Options
+                  </Button>
+
+                  <p className="text-xs text-gray-500 text-center">
                     Click "Browse Options" to view all dates and strikes
                   </p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor={`premium-${index}`} className="text-sm text-gray-400">
-                    Premium per contract*
-                  </Label>
-                  <NumberInput
-                    id={`premium-${index}`}
-                    placeholder="0.00"
-                    value={optionPremiums[index] || ''}
-                    onValueChange={(value) => setOptionPremiums(prev => ({ ...prev, [index]: value.toString() }))}
-                    classNames={{
-                      inputWrapper: "bg-dark-700 border-2 border-white/10 focus-within:border-primary shadow-none outline-none",
-                      input: "text-white"
-                    }}
-                    startContent={<span className="text-gray-400">$</span>}
-                    step={0.01}
-                    minValue={0}
-                    aria-label={`Premium for ${legs[index]?.label || 'option'}`}
-                    formatOptions={{
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
-                    }}
-                  />
-                  {optionPremiums[index] && selectedOptions[index] && (
-                    <p className="text-xs text-green-600">✓ Auto-filled from selected option</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor={`contracts-${index}`} className="text-sm text-gray-400">
-                    Contracts*
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <NumberInput
-                      id={`contracts-${index}`}
-                      value={legContracts[index] || '1'}
-                      onValueChange={(value) => setLegContracts(prev => ({ ...prev, [index]: value.toString() }))}
-                      classNames={{
-                        base: "w-24",
-                        inputWrapper: "bg-dark-700 border-2 border-white/10 focus-within:border-primary shadow-none outline-none",
-                        input: "text-white"
-                      }}
-                      minValue={1}
-                      step={1}
-                      aria-label={`Number of contracts for ${legs[index]?.label || 'option'}`}
-                    />
-                    <span className="text-xs text-gray-400">×100</span>
-                    <HelpCircle className="w-4 h-4 text-gray-500 cursor-help" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-gray-400">{legs.length === 1 ? 'Total Cost' : 'Leg Cost'}</div>
+              </div>
+
+              {/* Total Cost - Centered with header */}
+              <div className="mt-8">
+                <div className="bg-dark-900/50 border-2 border-red-500/30 rounded-lg p-2.5 max-w-[220px] mx-auto text-center">
+                  <div className="text-xs text-gray-400 mb-0.5">Total Cost</div>
                   <div className={`text-xl font-bold ${
                     (() => {
                       const premium = parseFloat(optionPremiums[index] || '0');
@@ -549,7 +593,7 @@ export function StrategyForm({ legs }: StrategyFormProps) {
                       return isLong ? `-$${cost.toFixed(2)}` : `+$${cost.toFixed(2)}`;
                     })()}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-gray-400 mt-0.5">
                     {(() => {
                       const position = legPositions[index] || leg.position;
                       return position === 'buy' ? 'Debit' : 'Credit';
@@ -557,9 +601,7 @@ export function StrategyForm({ legs }: StrategyFormProps) {
                   </div>
                 </div>
               </div>
-              {index === legs.length - 1 && (
-                <div className="text-xs text-gray-500 mt-4">* Manual settings</div>
-              )}
+              </div>
             </div>
           ))}
 
@@ -743,8 +785,8 @@ export function StrategyForm({ legs }: StrategyFormProps) {
         <UnifiedOptionsChain
           symbol={symbol}
           optionType={legs[showOptionsModal].type}
-          onOptionSelect={(optionSymbol, premium, strike, expiryDate, optionType) =>
-            handleModalOptionSelect(showOptionsModal, optionSymbol, premium, strike, expiryDate, optionType)
+          onOptionSelect={(optionSymbol, premium, strike, expiryDate, optionType, impliedVolatility) =>
+            handleModalOptionSelect(showOptionsModal, optionSymbol, premium, strike, expiryDate, optionType, impliedVolatility)
           }
           onClose={() => setShowOptionsModal(null)}
         />
