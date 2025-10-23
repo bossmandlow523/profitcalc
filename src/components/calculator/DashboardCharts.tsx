@@ -57,16 +57,14 @@ export function DashboardCharts({
         <div className="flex-1 w-full">
           <Card className="p-6">
             <div className="mb-4">
-              <div className="flex flex-col items-center">
-                <h3 className="text-lg font-semibold text-white">Profit/Loss Heatmap</h3>
-                <p className="text-sm text-gray-400 mt-1">P&L across price and time</p>
-                <p className="text-xs text-gray-500 mt-1 italic text-center">
-                  💡 Each date column uses the same time of day ({calculationTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })})
-                </p>
-              </div>
+              <div className="flex justify-between items-start">
+                <div className="flex flex-col items-start">
+                  <h3 className="text-lg font-semibold text-white">Profit/Loss Heatmap</h3>
+                  <p className="text-sm text-gray-400 mt-1">P&L across price and time</p>
+                </div>
 
-              {/* Heatmap Controls - Aligned with title */}
-              <div className="flex gap-8 items-start mt-4 justify-center">
+                {/* Heatmap Controls - Top Right Corner */}
+                <div className="flex gap-8 items-start">
                 {/* Date Steps Control */}
                 <div className="flex flex-col gap-2 items-center">
                   <label className="text-xs text-gray-400 font-medium">Date Points</label>
@@ -120,7 +118,12 @@ export function DashboardCharts({
                     </button>
                   </div>
                 </div>
+                </div>
               </div>
+
+              <p className="text-xs text-gray-500 mt-3 italic text-center">
+                💡 Each date column uses the same time of day ({calculationTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })})
+              </p>
             </div>
             <PLHeatmap
               legs={legs}

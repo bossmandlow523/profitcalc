@@ -1,6 +1,5 @@
 import { CalculatorLayout } from './CalculatorLayout'
 import { StrategyForm } from './StrategyForm'
-import { FAQSection } from './FAQSection'
 import { getStrategyConfig } from '../../lib/constants/strategy-configs'
 
 interface CalculatorPageProps {
@@ -37,9 +36,6 @@ export function CalculatorPage({ selectedStrategy, onBackToHome }: CalculatorPag
     >
       {/* Strategy Form with dynamic legs */}
       <StrategyForm legs={config.formConfig.legs} />
-
-      {/* FAQ Section */}
-      <FAQSection strategyName={config.name} questions={config.faqQuestions} />
     </CalculatorLayout>
   )
 }

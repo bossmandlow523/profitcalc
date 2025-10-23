@@ -74,7 +74,7 @@ export function StrategyGrid({ onSelectStrategy }: StrategyGridProps) {
 
   return (
     <div className="flex justify-center">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 relative z-20 pb-8 max-w-7xl scale-[1.07]">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-20 pb-8 max-w-7xl scale-110">
         {Object.entries(strategies).map(([key, strategy], index) => (
         <Card
           key={key}
@@ -124,8 +124,8 @@ export function StrategyGrid({ onSelectStrategy }: StrategyGridProps) {
           {/* Hover shimmer effect */}
           <div className="pointer-events-none absolute inset-0 z-20 rounded-lg bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
 
-          <CardHeader className="pb-4 space-y-0 relative border-b border-border/30">
-            <CardTitle className="text-base font-bold flex items-center justify-between">
+          <CardHeader className="pb-5 space-y-0 relative border-b border-border/30">
+            <CardTitle className="text-lg font-bold flex items-center justify-between">
               <span className="text-foreground drop-shadow-sm">{strategy.title}</span>
               <Badge variant={strategy.badgeVariant} className="text-xs font-semibold shadow-sm">
                 {strategy.items.length}
@@ -133,7 +133,7 @@ export function StrategyGrid({ onSelectStrategy }: StrategyGridProps) {
             </CardTitle>
           </CardHeader>
 
-          <CardContent className="space-y-2 relative pt-5">
+          <CardContent className="space-y-2.5 relative pt-6 pb-2">
             {strategy.items.map((item) => (
               <GlowButton
                 key={item}

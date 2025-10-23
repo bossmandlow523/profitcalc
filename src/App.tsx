@@ -28,7 +28,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col relative">
+    <div className="min-h-screen flex flex-col relative overflow-x-hidden">
       {/* Animated Background Grid */}
       <AnimatedGridPattern
         numSquares={40}

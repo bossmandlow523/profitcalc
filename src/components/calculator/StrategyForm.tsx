@@ -416,10 +416,10 @@ export function StrategyForm({ legs }: StrategyFormProps) {
               <div className="bg-gradient-to-r from-purple-600/20 via-purple-500/20 to-purple-600/20 border-b border-purple-500/30 py-6">
                 <div className="max-w-2xl mx-auto text-center px-8">
                   <h2 className="text-3xl font-bold text-white mb-1">
-                    {leg.type === 'call' ? 'Call' : 'Put'} Option
+                    {leg.label}
                   </h2>
                   <p className="text-gray-300 text-sm">
-                    ({leg.type === 'call' ? 'Call' : 'Put'} Option)
+                    ({leg.position === 'buy' ? 'Long' : 'Short'} {leg.type === 'call' ? 'Call' : 'Put'})
                   </p>
                 </div>
               </div>
@@ -701,64 +701,66 @@ export function StrategyForm({ legs }: StrategyFormProps) {
                 Calculate
               </Button>
             </div>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm">
-              <div className="text-gray-400">Stock price range:</div>
-              <NumberInput
-                value={priceRangeMin}
-                onValueChange={(value) => {
-                  setPriceRangeMin(value.toString())
-                  setIsManualPriceRange(true)
-                }}
-                classNames={{
-                  base: "w-28",
-                  inputWrapper: "bg-dark-700 border-2 border-white/10 focus-within:border-primary shadow-none outline-none",
-                  input: "text-white"
-                }}
-                placeholder="Min"
-                startContent={<span className="text-gray-400">$</span>}
-                step={0.01}
-                minValue={0}
-                aria-label="Minimum price range"
-                formatOptions={{
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                }}
-              />
-              <span className="text-gray-500">–</span>
-              <NumberInput
-                value={priceRangeMax}
-                onValueChange={(value) => {
-                  setPriceRangeMax(value.toString())
-                  setIsManualPriceRange(true)
-                }}
-                classNames={{
-                  base: "w-28",
-                  inputWrapper: "bg-dark-700 border-2 border-white/10 focus-within:border-primary shadow-none outline-none",
-                  input: "text-white"
-                }}
-                placeholder="Max"
-                startContent={<span className="text-gray-400">$</span>}
-                step={0.01}
-                minValue={0}
-                aria-label="Maximum price range"
-                formatOptions={{
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                }}
-              />
-              {isManualPriceRange && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsManualPriceRange(false)}
-                  className="h-7 px-2 text-xs text-primary hover:text-primary/80"
-                  title="Reset to auto-fill (±$5 from current price)"
-                >
-                  <RefreshCw className="w-3 h-3 mr-1" />
-                  Auto
-                </Button>
-              )}
-              <HelpCircle className="w-4 h-4 text-gray-500 cursor-help" />
+            <div className="mt-6 flex justify-center">
+              <div className="bg-dark-800/50 border border-white/5 rounded-lg px-4 py-2.5 inline-flex items-center gap-3">
+                <label className="text-sm font-medium text-gray-300">Stock price range:</label>
+                <NumberInput
+                  value={priceRangeMin}
+                  onValueChange={(value) => {
+                    setPriceRangeMin(value.toString())
+                    setIsManualPriceRange(true)
+                  }}
+                  classNames={{
+                    base: "w-36",
+                    inputWrapper: "bg-dark-700 border border-white/20 hover:border-white/30 focus-within:border-primary/60 shadow-sm transition-colors",
+                    input: "text-white"
+                  }}
+                  placeholder="Min"
+                  startContent={<span className="text-gray-400">$</span>}
+                  step={3}
+                  minValue={0}
+                  aria-label="Minimum price range"
+                  formatOptions={{
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  }}
+                />
+                <span className="text-gray-400">–</span>
+                <NumberInput
+                  value={priceRangeMax}
+                  onValueChange={(value) => {
+                    setPriceRangeMax(value.toString())
+                    setIsManualPriceRange(true)
+                  }}
+                  classNames={{
+                    base: "w-36",
+                    inputWrapper: "bg-dark-700 border border-white/20 hover:border-white/30 focus-within:border-primary/60 shadow-sm transition-colors",
+                    input: "text-white"
+                  }}
+                  placeholder="Max"
+                  startContent={<span className="text-gray-400">$</span>}
+                  step={3}
+                  minValue={0}
+                  aria-label="Maximum price range"
+                  formatOptions={{
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  }}
+                />
+                {isManualPriceRange && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsManualPriceRange(false)}
+                    className="h-7 px-2.5 text-xs text-primary hover:text-primary/80 hover:bg-primary/10 transition-colors"
+                    title="Reset to auto-fill (±$5 from current price)"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                    Auto
+                  </Button>
+                )}
+                <HelpCircle className="w-4 h-4 text-gray-400 hover:text-gray-300 cursor-help transition-colors" />
+              </div>
             </div>
             <div className="mt-4 flex items-center justify-center gap-2 text-sm">
               <input

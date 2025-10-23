@@ -57,14 +57,19 @@ export function normalPDF(x: number): number {
  * Returns minimum of MIN_TIME_TO_EXPIRY to avoid division by zero
  *
  * @param expiryDate - Expiration date of the option
+ * @param fromDate - Optional date to calculate from (defaults to current date)
  * @returns Time to expiry in years (minimum MIN_TIME_TO_EXPIRY)
  *
  * @example
  * const expiry = new Date('2025-12-31');
  * const timeToExpiry = calculateTimeToExpiry(expiry);
+ *
+ * // Calculate time to expiry from a specific future date
+ * const futureDate = new Date('2025-06-01');
+ * const timeToExpiryFromFuture = calculateTimeToExpiry(expiry, futureDate);
  */
-export function calculateTimeToExpiry(expiryDate: Date): number {
-  const now = new Date();
+export function calculateTimeToExpiry(expiryDate: Date, fromDate?: Date): number {
+  const now = fromDate ? new Date(fromDate) : new Date();
   const expiry = new Date(expiryDate);
 
   // Calculate time difference in milliseconds
