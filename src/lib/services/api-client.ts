@@ -147,7 +147,7 @@ export class ApiClient {
 
   constructor(config: Partial<ApiConfig> = {}) {
     this.config = {
-      baseUrl: config.baseUrl || '/api',
+      baseUrl: config.baseUrl || import.meta.env.VITE_API_URL || '/api',
       timeout: config.timeout || 15000,
       retryAttempts: config.retryAttempts || 2,
       retryDelay: config.retryDelay || 1000,
