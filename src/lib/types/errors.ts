@@ -18,8 +18,8 @@ export class CalculationError extends Error {
     this.context = context;
 
     // Maintains proper stack trace for where error was thrown (V8 only)
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, CalculationError);
+    if (typeof Error.captureStackTrace === 'function') {
+      (Error as any).captureStackTrace(this, CalculationError);
     }
   }
 }

@@ -11,6 +11,8 @@ import { UnifiedOptionsChain } from './UnifiedOptionsChain'
 import { StockPositionInput } from './StockPositionInput'
 import { DashboardCharts } from './DashboardCharts'
 import { OptionType, Position, StockLeg } from '../../lib/types'
+import { ShinyButton } from '@/components/ui/shiny-button'
+import { ShineBorder } from '@/components/ui/shine-border'
 
 interface StrategyFormProps {
   legs: LegConfig[]
@@ -692,14 +694,21 @@ export function StrategyForm({ legs }: StrategyFormProps) {
 
           {/* Calculate Button */}
           <div className="pt-2">
-            <div className="text-center">
-              <Button
-                onClick={handleCalculate}
-                className="shimmer-effect inline-flex items-center justify-center gap-2 px-10 py-4 rounded-xl bg-gradient-to-r from-primary via-secondary to-purple-500 text-white font-bold text-lg shadow-2xl hover:shadow-primary/50 hover:scale-105 transition-all duration-200 animate-glow-pulse"
-              >
-                <Calculator className="w-5 h-5" />
-                Calculate
-              </Button>
+            <div className="flex justify-center">
+              <div className="relative">
+                <ShineBorder
+                  shineColor={["#A855F7", "#8B5CF6", "#7C3AED"]}
+                  borderWidth={2}
+                  duration={3}
+                />
+                <ShinyButton
+                  onClick={handleCalculate}
+                  className="relative px-8 py-4 text-3xl font-black bg-gradient-to-r from-purple-600 via-primary to-purple-600 hover:from-purple-500 hover:via-secondary hover:to-purple-500 border-0 shadow-[0_0_40px_rgba(168,85,247,0.6)] hover:shadow-[0_0_60px_rgba(168,85,247,0.8)] transition-all duration-300 hover:scale-110"
+                >
+                  <Calculator className="mr-3 h-8 w-8 inline" />
+                  Calculate Strategy
+                </ShinyButton>
+              </div>
             </div>
             <div className="mt-6 flex justify-center">
               <div className="bg-dark-800/50 border border-white/5 rounded-lg px-4 py-2.5 inline-flex items-center gap-3">

@@ -1,0 +1,547 @@
+.neon-button-area {
+  --ease-elastic: cubic-bezier(0.5, 2, 0.3, 0.8);
+  --ease-elastic-2: cubic-bezier(0.5, -1, 0.3, 0.8);
+  --primary: hsl(243 75% 59%);
+  --primary-glow: hsl(243 75% 69%);
+  --secondary: hsl(258 90% 66%);
+  --rounded-max: 100px;
+  --rounded-min: 10px;
+  --h: 48px;
+
+  display: inline-block;
+  position: relative;
+  background: transparent;
+}
+
+.neon-button-area svg {
+  overflow: visible;
+}
+
+.neon-area-wrapper {
+  position: relative;
+  padding: 0;
+  cursor: pointer;
+}
+
+.neon-area-wrapper.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.neon-area-wrapper:hover .neon-wrapper {
+  transform: translateY(0) scale(1);
+}
+
+.neon-area-wrapper:hover .wrapper .case .mask {
+  box-shadow:
+    inset 8px -15px 15px -10px black,
+    inset 10px -17px 12px -12px white,
+    0 20px 50px -5px #111;
+}
+
+.neon-area-wrapper:hover .part-2 .glass {
+  box-shadow:
+    inset 0 0 7px -4px white,
+    inset 0 -10px 10px -8px rgba(255, 255, 255, 0.4),
+    inset 8px -15px 15px -10px black,
+    inset 8px -10px 12px -12px white,
+    0 20px 50px -5px #111;
+}
+
+.neon-wrapper {
+  display: block;
+  border-radius: 100px;
+  position: relative;
+  z-index: 2;
+  transition: all 0.6s var(--ease-elastic);
+  transform: scale(0.75);
+}
+
+.neon-wrapper input {
+  position: absolute;
+  background: transparent;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  z-index: 10;
+  cursor: pointer;
+  pointer-events: all;
+  user-select: none;
+  outline: none;
+}
+
+.neon-button {
+  background: transparent;
+  display: flex;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.neon-button::before {
+  display: none;
+}
+
+.neon-button::after {
+  display: none;
+}
+
+.part-1 {
+  position: relative;
+  z-index: 1;
+  height: var(--h);
+  width: 80px;
+  border-radius: var(--rounded-max) var(--rounded-min) var(--rounded-min) var(--rounded-max);
+}
+
+.part-1 .line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -1px;
+  transition: all 0.4s ease;
+}
+
+.part-1 .line::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  content: "";
+  width: 1px;
+  background: white;
+  box-shadow: 1px 0 10px 3px var(--primary-glow);
+  border-radius: 50%;
+  height: 0%;
+  margin: auto;
+  animation: 1.8s line ease infinite;
+}
+
+.part-1 .screw {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  margin: auto;
+  z-index: -1;
+  overflow: hidden;
+  padding: 10px 0;
+}
+
+.part-1 .screw svg {
+  width: auto;
+  height: 60px;
+}
+
+.part-1 .screw svg g {
+  transform-origin: center;
+}
+
+.part-1 .screw svg .dot {
+  color: #8e8c8b;
+}
+
+.part-1 .case {
+  height: var(--h);
+  width: 80px;
+  border-radius: inherit;
+  transform: translateX(-40px);
+  transition: all 0.9s var(--ease-elastic);
+}
+
+.part-1 .case .mask {
+  position: absolute;
+  overflow: hidden;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    to bottom,
+    #2c2e31 0%,
+    #31343e 20%,
+    #212329 100%
+  );
+  box-shadow:
+    inset 8px -15px 15px -10px black,
+    inset 10px -17px 12px -12px white,
+    0 30px 70px -5px #111;
+  transition: all 0.9s var(--ease-elastic);
+}
+
+.part-1 .case .mask::before {
+  content: "";
+  position: absolute;
+  border-radius: inherit;
+  left: 30%;
+  top: 23%;
+  width: 100%;
+  height: 30%;
+  background: white;
+  filter: blur(12px);
+}
+
+.part-1 .case .mask::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: rgba(255, 255, 255, 0.2);
+  mix-blend-mode: overlay;
+}
+
+.part-2 {
+  position: relative;
+  height: var(--h);
+  width: 160px;
+  border-radius: var(--rounded-min) var(--rounded-max) var(--rounded-max) var(--rounded-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.6s ease;
+}
+
+.part-2 .glass {
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+  transition: all 0.9s var(--ease-elastic);
+  border-radius: inherit;
+  border-left: 1px solid rgba(99, 102, 241, 0.3);
+  background: linear-gradient(
+    to bottom,
+    hsl(243 75% 59% / 0.2) 0%,
+    hsl(258 90% 66% / 0.25) 50%,
+    hsl(243 75% 59% / 0.15) 100%
+  );
+  box-shadow:
+    inset 0 0 7px -4px hsl(243 75% 69%),
+    inset 0 -10px 10px -8px hsl(243 75% 69% / 0.4),
+    inset 8px -15px 15px -10px hsl(243 75% 20%),
+    inset 8px -10px 12px -12px hsl(243 75% 69%),
+    0 30px 70px -5px hsl(243 75% 59% / 0.2);
+}
+
+.part-2 .glass::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10%;
+  right: 14%;
+  height: 70%;
+  border-radius: 0 25px 0 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0) 60%
+  );
+}
+
+.part-2 .glass::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 15%;
+  right: 5%;
+  height: 75%;
+  border-radius: 0 30px 30px 0;
+  box-shadow: inset -2px -6px 5px -5px rgba(255, 255, 255, 0.8);
+  filter: blur(3px);
+}
+
+.part-2 .glass-reflex {
+  position: absolute;
+  inset: 0;
+  width: 70%;
+  border-radius: 0 50% 50% 0;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.2) 100%
+  );
+  transform: translateX(-115%) skewX(30deg);
+}
+
+.part-2 .glass-noise {
+  position: absolute;
+  inset: 0;
+  opacity: 0.2;
+}
+
+.part-2 .path-glass {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.6s linear;
+  opacity: 0;
+}
+
+.part-2 .path-glass path {
+  stroke-dashoffset: 430;
+  stroke-dasharray: 430 430;
+  animation: 1.4s path-glass ease infinite;
+}
+
+@keyframes path-glass {
+  0% {
+    stroke-dasharray: 430 430;
+    color: greenyellow;
+    opacity: 1;
+    filter: blur(2px);
+  }
+  50% {
+    stroke-dasharray: 860 430;
+    opacity: 1;
+    filter: blur(4px);
+  }
+  100% {
+    stroke-dasharray: 860 430;
+    color: var(--primary);
+    opacity: 0;
+  }
+}
+
+.part-2 .filament {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  margin: auto;
+  width: auto;
+  height: 26px;
+  stroke-width: 2px;
+  opacity: 0.3;
+}
+
+.part-2 .filament path {
+  transition: all 0.6s ease-in-out;
+}
+
+.part-2 .filament-on {
+  opacity: 1;
+}
+
+.part-2 .filament-on path {
+  stroke-dashoffset: 100;
+  stroke-dasharray: 100 100;
+}
+
+.part-2 .filament-blur {
+  opacity: 1;
+  filter: blur(8px);
+  color: var(--primary-glow);
+  stroke-width: 10px;
+}
+
+.text {
+  transition: all 0.3s ease;
+  transform: translateY(-4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.03em;
+  position: absolute;
+  inset: 0;
+}
+
+.text span {
+  display: block;
+  color: transparent;
+  position: relative;
+}
+
+
+.text span::before,
+.text span::after {
+  content: attr(data-label);
+  position: absolute;
+  font-size: 26px;
+  font-weight: 900;
+  left: 0;
+  color: #ffffff;
+  text-shadow:
+    0 0 2px rgba(255, 255, 255, 1),
+    0 0 4px rgba(255, 255, 255, 0.9),
+    0 0 8px rgba(255, 255, 255, 0.7),
+    0 0 15px var(--primary-glow),
+    0 0 25px var(--primary),
+    0 1px 2px rgba(0, 0, 0, 0.8);
+  -webkit-text-stroke: 0.5px rgba(255, 255, 255, 0.3);
+}
+
+.text span::before {
+  opacity: 0;
+  transform: translateY(-100%);
+}
+
+.neon-area-wrapper input:checked ~ .neon-button .filament path {
+  transition-delay: 0.6s;
+}
+
+.neon-area-wrapper:hover input:checked ~ .neon-button .filament path {
+  stroke-dasharray: 100 0;
+}
+
+.neon-area-wrapper input:checked ~ .neon-button .part-1 .case {
+  transform: translateX(0px);
+  transition: all 1.25s var(--ease-elastic-2);
+}
+
+.neon-area-wrapper:hover input:checked ~ .neon-button::before,
+.neon-area-wrapper:hover input:checked ~ .neon-button::after,
+.neon-area-wrapper:hover input:checked ~ .neon-button .path-glass {
+  opacity: 1;
+}
+
+.neon-area-wrapper:hover .neon-button .part-1 .line {
+  opacity: 0;
+}
+
+.neon-area-wrapper input:not(:checked) ~ .neon-button .part-1 .line::before {
+  box-shadow: 1px 0 10px 3px hsl(243 75% 69% / 0.4);
+  background: rgb(140, 140, 140);
+}
+
+.neon-area-wrapper:hover .glass-reflex {
+  animation: reflex 0.6s ease;
+}
+
+.neon-area-wrapper:hover .text span::before {
+  animation: char-in 1s ease calc(var(--i) * 0.03s) forwards;
+}
+
+.neon-area-wrapper:hover .text span::after,
+.neon-area-wrapper input:not(:checked) ~ .neon-button .text.state-1 span::before,
+.neon-area-wrapper input:not(:checked) ~ .neon-button .text.state-1 span::after,
+.neon-area-wrapper input:checked ~ .neon-button .text.state-2 span::before,
+.neon-area-wrapper input:checked ~ .neon-button .text.state-2 span::after {
+  opacity: 0;
+  animation: char-out 1.3s ease calc(var(--i) * 0.04s) backwards;
+}
+
+.neon-area-wrapper input:not(:checked) ~ .neon-button .part-1 .screw g {
+  animation: pulse 0.8s ease calc(var(--i) * 0.1s) backwards;
+}
+
+.neon-area-wrapper input:checked ~ .neon-button .part-1 .screw g {
+  animation: pulse-out 0.8s ease calc((5 - var(--i)) * 0.2s) backwards;
+}
+
+.neon-area-wrapper input:not(:checked) ~ .neon-button .part-1 .screw .dot {
+  animation: dot 0.7s ease calc(var(--i) * 0.15s) backwards;
+}
+
+.neon-area-wrapper input:checked ~ .neon-button .part-1 .screw .dot {
+  animation: dot-out 0.7s ease calc((3 - var(--i)) * 0.15s) forwards;
+}
+
+@keyframes line {
+  0% {
+    height: 0%;
+    opacity: 1;
+  }
+  50% {
+    height: 100%;
+    opacity: 1;
+  }
+  100% {
+    height: 140%;
+    opacity: 0;
+  }
+}
+
+@keyframes dot {
+  30% {
+    color: var(--primary);
+    filter: blur(2px);
+  }
+}
+
+@keyframes dot-out {
+  40% {
+    color: white;
+    filter: blur(2px);
+  }
+}
+
+@keyframes pulse {
+  30% {
+    transform: scaleY(0.8);
+  }
+}
+
+@keyframes pulse-out {
+  40% {
+    transform: scaleY(0.8);
+  }
+}
+
+@keyframes char-in {
+  0% {
+    opacity: 0;
+    transform: scale(10) translateX(-25%);
+    filter: blur(10px);
+    color: rgb(0, 251, 255);
+  }
+  25% {
+    transform: translateY(-15%);
+    opacity: 1;
+    filter: blur(1px);
+    color: var(--primary);
+  }
+  50% {
+    transform: translateY(7%);
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes char-out {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-70%);
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+@keyframes reflex {
+  0% {
+    transform: translateX(-115%);
+  }
+  100% {
+    transform: translateX(140%);
+  }
+}
+
+.noise {
+  display: none;
+}
+
+.neon-bg {
+  display: none;
+}
+
+.neon-bg svg {
+  display: none;
+}
+
+.neon-bg::before {
+  display: none;
+}
+
+.neon-bg .light-1,
+.neon-bg .light-2,
+.neon-bg .light-3 {
+  display: none;
+}

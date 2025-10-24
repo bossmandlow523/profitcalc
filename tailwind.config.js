@@ -94,6 +94,7 @@ export default {
         'shimmer': 'shimmer 3s linear infinite',
         'glow-pulse': 'glowPulse 2s ease-in-out infinite',
         'border-beam': 'border-beam calc(var(--duration)*1s) infinite linear',
+        'shine': 'shine var(--duration) infinite linear',
       },
       keyframes: {
         fadeIn: {
@@ -120,6 +121,11 @@ export default {
           '100%': {
             'offset-distance': '100%',
           },
+        },
+        shine: {
+          '0%': { backgroundPosition: '0% 0%' },
+          '50%': { backgroundPosition: '100% 100%' },
+          '100%': { backgroundPosition: '0% 0%' }
         },
       },
       backgroundImage: {

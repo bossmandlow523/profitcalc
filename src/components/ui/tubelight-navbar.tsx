@@ -9,6 +9,7 @@ interface NavItem {
   name: string
   onClick?: () => void
   icon: LucideIcon
+  disabled?: boolean
 }
 
 interface NavBarProps {
@@ -39,6 +40,8 @@ export function NavBar({ items, className, activeItem, onItemClick }: NavBarProp
   }, [activeItem])
 
   const handleClick = (item: NavItem) => {
+    if (item.disabled) return
+
     setActiveTab(item.name)
     if (item.onClick) {
       item.onClick()
@@ -55,7 +58,7 @@ export function NavBar({ items, className, activeItem, onItemClick }: NavBarProp
         className,
       )}
     >
-      <div className="flex items-center gap-1 bg-background/10 border border-border/40 backdrop-blur-xl px-1 py-0.5 rounded-full shadow-lg">
+      <div className="flex items-center gap-2 bg-background/10 border border-border/40 backdrop-blur-xl px-2 py-1.5 rounded-full shadow-lg">
         {items.map((item) => {
           const Icon = item.icon
           const isActive = activeTab === item.name
@@ -65,14 +68,16 @@ export function NavBar({ items, className, activeItem, onItemClick }: NavBarProp
               key={item.name}
               onClick={() => handleClick(item)}
               className={cn(
-                "relative cursor-pointer text-xs font-medium px-4 py-1.5 rounded-full transition-colors",
-                "text-foreground/70 hover:text-primary",
+                "relative text-sm font-medium px-6 py-2.5 rounded-full transition-colors",
+                item.disabled
+                  ? "cursor-default text-foreground/70"
+                  : "cursor-pointer text-foreground/70 hover:text-primary",
                 isActive && "text-primary",
               )}
             >
               <span className="hidden md:inline">{item.name}</span>
               <span className="md:hidden">
-                <Icon size={16} strokeWidth={2.5} />
+                <Icon size={20} strokeWidth={2.5} />
               </span>
               {isActive && (
                 <motion.div

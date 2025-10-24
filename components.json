@@ -19,17 +19,41 @@
   },
   "iconLibrary": "lucide",
   "registries": {
-    "@shadcn": "https://ui.shadcn.com/r/{name}.json",
-    "@aceternity": "https://ui.aceternity.com/registry/{name}.json",
-    "@magicui": "https://magicui.design/r/{name}.json",
-    "@motion-primitives": "https://motion-primitives.com/c/{name}.json",
-    "@smoothui": "https://smoothui.dev/r/{name}.json",
-    "@scrollxui": "https://www.scrollxui.dev/registry/{name}.json",
-    "@animate-ui": "https://animate-ui.com/r/{name}.json",
-    "@originui": "https://originui.com/r/{name}.json",
-    "@kokonutui": "https://kokonutui.com/r/{name}.json",
-    "@cult-ui": "https://cult-ui.com/r/{name}.json",
-    "@blocks": "https://blocks.so/r/{name}.json",
-    "@react-bits": "https://reactbits.dev/r/{name}.json"
+    "@shadcn": {
+      "url": "https://ui.shadcn.com/r/{name}.json"
+    },
+    "@aceternity": {
+      "url": "https://ui.aceternity.com/registry/{name}.json"
+    },
+    "@magicui": {
+      "url": "https://magicui.design/r/{name}.json"
+    },
+    "@motion-primitives": {
+      "url": "https://motion-primitives.com/c/{name}.json"
+    },
+    "@smoothui": {
+      "url": "https://smoothui.dev/r/{name}.json"
+    },
+    "@scrollxui": {
+      "url": "https://www.scrollxui.dev/registry/{name}.json"
+    },
+    "@animate-ui": {
+      "url": "https://animate-ui.com/r/{name}.json"
+    },
+    "@originui": {
+      "url": "https://originui.com/r/{name}.json"
+    },
+    "@kokonutui": {
+      "url": "https://kokonutui.com/r/{name}.json"
+    },
+    "@cult-ui": {
+      "url": "https://cult-ui.com/r/{name}.json"
+    },
+    "@blocks": {
+      "url": "https://blocks.so/r/{name}.json"
+    },
+    "@react-bits": {
+      "url": "https://reactbits.dev/r/{name}.json"
+    }
   }
 }

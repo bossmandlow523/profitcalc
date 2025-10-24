@@ -47,7 +47,9 @@
       "Bash(node -e \"\n// Simulate Black-Scholes for $130 call\nconst S = 252.29;  // Stock price\nconst K = 130;     // Strike\nconst T = 6/365;   // 6 days to expiry\nconst r = 0.045;   // Risk-free rate\nconst sigma = 2.20; // IV interpolated from 120 ($2.32) and 140 ($1.97)\n\nconst intrinsic = Math.max(0, S - K);\nconsole.log(''Intrinsic Value: $'' + intrinsic.toFixed(2));\n\n// Simple approximation: Deep ITM has minimal extrinsic\nconst extrinsic = 0.08; // Estimated\nconst theoreticalPrice = intrinsic + extrinsic;\n\nconsole.log(''Extrinsic Value: $'' + extrinsic.toFixed(2));\nconsole.log(''Theoretical Price: $'' + theoreticalPrice.toFixed(2));\nconsole.log(''Bid (synthetic): $'' + (theoreticalPrice - 0.65).toFixed(2));\nconsole.log(''Ask (synthetic): $'' + (theoreticalPrice + 0.65).toFixed(2));\n\")",
       "Bash(git fsck:*)",
       "Bash(node verify-heatmap-fix.js:*)",
-      "Bash(del \"c:\\Users\\nicks\\OneDrive\\Desktop\\calc\\src\\components\\ui\\animated-footer.tsx\")"
+      "Bash(del \"c:\\Users\\nicks\\OneDrive\\Desktop\\calc\\src\\components\\ui\\animated-footer.tsx\")",
+      "Bash(rm:*)",
+      "Bash(git add:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

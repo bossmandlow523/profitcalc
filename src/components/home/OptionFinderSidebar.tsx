@@ -1,52 +1,13 @@
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
-import { Sparkles, TrendingUp, Shield, AlertCircle, Globe } from 'lucide-react'
+import { ArrowRight, BookOpen } from 'lucide-react'
 
-const updates = [
-  {
-    icon: Sparkles,
-    title: 'Ad-Free Experience',
-    description: 'with our Membership program',
-    color: 'text-primary',
-    borderColor: 'border-primary/30',
-    bgColor: 'bg-primary/10',
-  },
-  {
-    icon: Shield,
-    title: 'Cash Secured Put',
-    description: 'calculator added',
-    color: 'text-emerald-500',
-    borderColor: 'border-emerald-400/30',
-    bgColor: 'bg-emerald-500/10',
-  },
-  {
-    icon: TrendingUp,
-    title: "Poor Man's Covered Call",
-    description: 'calculator added',
-    color: 'text-purple-500',
-    borderColor: 'border-purple-400/30',
-    bgColor: 'bg-purple-500/10',
-  },
-  {
-    icon: AlertCircle,
-    title: 'Find the best spreads',
-    description: 'and short options',
-    color: 'text-orange-500',
-    borderColor: 'border-orange-400/30',
-    bgColor: 'bg-orange-500/10',
-  },
-  {
-    icon: Globe,
-    title: 'Support for Canadian MX',
-    description: 'options',
-    color: 'text-red-500',
-    borderColor: 'border-red-400/30',
-    bgColor: 'bg-red-500/10',
-  },
-]
+interface OptionFinderSidebarProps {
+  onNavigateToStrategies?: () => void
+}
 
-export function OptionFinderSidebar() {
+export function OptionFinderSidebar({ onNavigateToStrategies }: OptionFinderSidebarProps = {}) {
   return (
     <aside className="w-full lg:w-80 space-y-5">
       {/* Option Finder CTA */}
@@ -74,7 +35,7 @@ export function OptionFinderSidebar() {
         </CardContent>
       </Card>
 
-      {/* Updates Section */}
+      {/* Strategy Help Section */}
       <Card className="glass-card-strong border-border/50 shadow-lg">
         <CardHeader className="pb-4">
           <CardTitle className="text-center">
@@ -83,34 +44,29 @@ export function OptionFinderSidebar() {
             </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {updates.map((update, index) => {
-            const Icon = update.icon
-            return (
-              <div
-                key={index}
-                className={`flex items-start gap-3 p-3 ${update.bgColor} rounded-lg border ${update.borderColor} hover:border-primary/40 transition-all duration-200 cursor-pointer group`}
-              >
-                <div className={`mt-0.5 flex-shrink-0 ${update.color}`}>
-                  <Icon className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-foreground text-sm group-hover:text-primary transition-colors">
-                    {update.title}
-                  </h4>
-                  <p className="text-muted-foreground text-xs">{update.description}</p>
-                </div>
-              </div>
-            )
-          })}
-          <div className="text-center pt-2">
-            <Button
-              variant="link"
-              className="text-primary hover:text-secondary text-sm font-medium h-auto p-0"
-            >
-              More updates →
-            </Button>
+        <CardContent className="space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-purple-500/20 rounded-lg flex-shrink-0">
+              <BookOpen className="w-5 h-5 text-purple-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-white mb-2">
+                Need Help Picking a Strategy?
+              </h3>
+            </div>
           </div>
+
+          <p className="text-foreground/80 text-sm leading-relaxed">
+            Explore <span className="font-semibold text-purple-400">20+ options strategies</span> with detailed breakdowns covering when to use them, how they work, and what risks they carry. From basic calls and puts to advanced iron condors and multi-leg positions.
+          </p>
+
+          <Button
+            onClick={onNavigateToStrategies}
+            className="group w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold shadow-md hover:shadow-lg transition-all duration-300"
+          >
+            View All Strategies
+            <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </Button>
         </CardContent>
       </Card>
     </aside>

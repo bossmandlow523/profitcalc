@@ -7,9 +7,10 @@ import { Typewriter } from '../ui/typewriter'
 
 interface HomePageProps {
   onSelectStrategy: (strategy: string) => void
+  onNavigateToStrategies: () => void
 }
 
-export function HomePage({ onSelectStrategy }: HomePageProps) {
+export function HomePage({ onSelectStrategy, onNavigateToStrategies }: HomePageProps) {
   return (
     <main className="relative z-10 flex-1">
       {/* Main Content Container */}
@@ -18,7 +19,7 @@ export function HomePage({ onSelectStrategy }: HomePageProps) {
           {/* Left Sidebar - Sticky on large screens */}
           <div className="hidden xl:block w-72 flex-shrink-0 -ml-4">
             <div className="sticky top-8">
-              <OptionFinderSidebar />
+              <OptionFinderSidebar onNavigateToStrategies={onNavigateToStrategies} />
             </div>
           </div>
 
@@ -73,7 +74,7 @@ export function HomePage({ onSelectStrategy }: HomePageProps) {
         <div className="xl:hidden mt-8">
           <Separator className="mb-8 bg-border/50" />
           <div className="max-w-md mx-auto">
-            <OptionFinderSidebar />
+            <OptionFinderSidebar onNavigateToStrategies={onNavigateToStrategies} />
           </div>
         </div>
       </div>
