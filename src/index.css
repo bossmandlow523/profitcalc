@@ -36,6 +36,7 @@
   }
 
   html {
+    font-size: 12.8px; /* 80% of default 16px - makes 100% zoom look like 80% */
     scroll-behavior: smooth;
     scroll-padding-top: 4rem;
   }
