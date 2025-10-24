@@ -49,7 +49,9 @@
       "Bash(node verify-heatmap-fix.js:*)",
       "Bash(del \"c:\\Users\\nicks\\OneDrive\\Desktop\\calc\\src\\components\\ui\\animated-footer.tsx\")",
       "Bash(rm:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(npm run preview:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nAdd comprehensive Vercel deployment checklist\n\nCreated detailed pre-deployment and post-deployment checklist including:\n- Build verification steps\n- Deployment methods (CLI and GitHub)\n- Environment variable configuration\n- SEO and performance testing\n- Custom domain setup\n- CI/CD configuration\n- Troubleshooting guide\n- Rollback procedures\n- Success metrics\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ]
   },
   "enableAllProjectMcpServers": true,

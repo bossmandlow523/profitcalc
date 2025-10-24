@@ -695,15 +695,16 @@ export function StrategyForm({ legs }: StrategyFormProps) {
           {/* Calculate Button */}
           <div className="pt-2">
             <div className="flex justify-center">
-              <div className="relative">
+              <div className="relative inline-block rounded-2xl overflow-visible">
                 <ShineBorder
                   shineColor={["#A855F7", "#8B5CF6", "#7C3AED"]}
-                  borderWidth={2}
+                  borderWidth={3}
                   duration={3}
+                  className="rounded-2xl"
                 />
                 <ShinyButton
                   onClick={handleCalculate}
-                  className="relative px-8 py-4 text-3xl font-black bg-gradient-to-r from-purple-600 via-primary to-purple-600 hover:from-purple-500 hover:via-secondary hover:to-purple-500 border-0 shadow-[0_0_40px_rgba(168,85,247,0.6)] hover:shadow-[0_0_60px_rgba(168,85,247,0.8)] transition-all duration-300 hover:scale-110"
+                  className="relative px-8 py-4 text-3xl font-black bg-gradient-to-r from-purple-600 via-primary to-purple-600 hover:from-purple-500 hover:via-secondary hover:to-purple-500 rounded-2xl shadow-[0_0_40px_rgba(168,85,247,0.6)] hover:shadow-[0_0_60px_rgba(168,85,247,0.8)] transition-all duration-300 hover:scale-105"
                 >
                   <Calculator className="mr-3 h-8 w-8 inline" />
                   Calculate Strategy
