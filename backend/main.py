@@ -28,7 +28,13 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",  # Vite dev server
         "http://localhost:3000",  # Alternative port
-        "https://*.vercel.app",   # Vercel preview/production
+        "https://optionsprofitcalc.net",  # Custom domain (production)
+        "https://www.optionsprofitcalc.net",  # Custom domain with www
+        "http://optionsprofitcalc.net",  # HTTP version
+        "http://www.optionsprofitcalc.net",  # HTTP www version
+        "https://profitcalc-6mar4clzm-app74s-projects.vercel.app",  # Vercel production
+        "https://profitcalc-git-master-app74s-projects.vercel.app",  # Vercel git master
+        "https://calc-jade-sigma.vercel.app",  # Alternative frontend URL
     ],
     allow_credentials=True,
     allow_methods=["*"],
